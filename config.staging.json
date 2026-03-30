@@ -1,0 +1,12 @@
+{
+  "t3nApiUrl": "https://cn-api.sg.staging.t3n.terminal3.io",
+  "t3nRuntimeApiPath": "/api/rpc",
+  "dashboardUrl": "https://staging.trinity.terminal3.io",
+  "findUserDid": "/profile",
+  "registerUserDid": "/onboarding",
+  "agentsUrl": "/agents",
+  "hederaJsonRpcUrl": "https://testnet.hashio.io/api",
+  "hederaErc8004IdentityRegistryAddress": "0x4c74ebd72921d537159ed2053f46c12a7d8e5923",
+  "hederaChainId": 296,
+  "hederaExplorerUrl": "https://hashscan.io/testnet"
+}

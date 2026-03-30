@@ -1,0 +1,26 @@
+{
+  "name": "hedera-t3n-plugin-examples-ai-sdk",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "ai-sdk:plugin-tool-calling-agent": "tsx tool-calling-agent.ts",
+    "ai-sdk:tool-calling-agent": "tsx tool-calling-agent.ts"
+  },
+  "dependencies": {
+    "@ai-sdk/openai": "^3.0.41",
+    "@hashgraph/sdk": "^2.80.0",
+    "ai": "^6.0.116",
+    "dotenv": "^17.2.3",
+    "hedera-agent-kit": "^3.8.0",
+    "@terminal3/hedera-t3n-plugin": "file:../../..",
+    "prompts": "^2.4.2"
+  },
+  "devDependencies": {
+    "@types/node": "^20.10.6",
+    "@types/prompts": "^2.4.9",
+    "tsx": "^4.21.0",
+    "typescript": "^5.9.3"
+  }
+}

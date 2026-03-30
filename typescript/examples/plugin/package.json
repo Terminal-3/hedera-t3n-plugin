@@ -1,0 +1,20 @@
+{
+  "name": "hedera-t3n-plugin-example-plugin",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "showcase": "tsx example-plugin.ts"
+  },
+  "dependencies": {
+    "hedera-agent-kit": "^3.8.0",
+    "@terminal3/hedera-t3n-plugin": "file:../../..",
+    "zod": "^3.25.76"
+  },
+  "devDependencies": {
+    "@types/node": "^20.10.6",
+    "tsx": "^4.21.0",
+    "typescript": "^5.9.3"
+  }
+}

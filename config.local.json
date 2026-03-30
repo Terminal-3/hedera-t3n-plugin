@@ -1,0 +1,8 @@
+{
+  "t3nApiUrl": "http://127.0.0.1:3000",
+  "t3nRuntimeApiPath": "/api/rpc",
+  "dashboardUrl": "http://127.0.0.1:5173",
+  "findUserDid": "/profile",
+  "registerUserDid": "/onboarding",
+  "agentsUrl": "/agents"
+}

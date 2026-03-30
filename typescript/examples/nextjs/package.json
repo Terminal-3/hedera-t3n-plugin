@@ -1,0 +1,41 @@
+{
+  "name": "hedera-t3n-plugin-nextjs-example",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "packageManager": "pnpm@10.13.1+sha512.37ebf1a5c7a30d5fabe0c5df44ee8da4c965ca0c5af3dbab28c3a1681b70a256218d05c81c9c0dcf767ef6b8551eb5b960042b9ed4300c59242336377e01cfad",
+  "scripts": {
+    "predev": "pnpm --dir ../../.. build",
+    "dev": "dotenv -e .env -- next dev",
+    "prebuild": "pnpm --dir ../../.. build",
+    "build": "next build",
+    "start": "dotenv -e .env -- next start",
+    "test": "vitest run",
+    "lint": "eslint . --max-warnings=0"
+  },
+  "dependencies": {
+    "@ai-sdk/openai": "^3.0.41",
+    "@ai-sdk/openai-compatible": "^2.0.35",
+    "@ai-sdk/react": "^3.0.118",
+    "@hashgraph/sdk": "^2.80.0",
+    "ai": "^6.0.116",
+    "hedera-agent-kit": "^3.8.0",
+    "@terminal3/hedera-t3n-plugin": "file:../../..",
+    "next": "^16.1.6",
+    "react": "^19.2.4",
+    "react-dom": "^19.2.4",
+    "zod": "^4.3.6"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.19.0",
+    "@types/node": "^20.10.6",
+    "@types/react": "19.2.14",
+    "@types/react-dom": "^19.2.2",
+    "dotenv-cli": "^7.4.4",
+    "eslint": "^9.19.0",
+    "globals": "^17.3.0",
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.55.0",
+    "vitest": "^4.0.18"
+  }
+}

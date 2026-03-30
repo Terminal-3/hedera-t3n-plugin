@@ -1,0 +1,35 @@
+# Hedera T3N Plugin Example
+
+This example mirrors the upstream Hedera Agent Kit `plugin` example, but the
+showcase is `hedera-t3n-plugin` instead of a toy plugin.
+
+It demonstrates two things:
+
+- how to import and reuse `hederaT3nPlugin`
+- how to compose it with your own local plugin tool without forking the package
+
+## Files
+
+- `example-plugin.ts`: defines `composedT3nPlugin`, which appends a local
+  guidance tool to the built-in T3N plugin tools
+
+## Install
+
+```bash
+pnpm install
+```
+
+## Validate
+
+```bash
+pnpm typecheck
+```
+
+## Run
+
+```bash
+pnpm showcase
+```
+
+The showcase script prints the tool methods exposed by `hederaT3nPlugin` and by
+the composed plugin variant so you can see exactly what gets added.

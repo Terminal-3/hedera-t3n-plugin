@@ -1,0 +1,130 @@
+{
+  "name": "@terminal3/hedera-t3n-plugin",
+  "version": "2.0.0",
+  "description": "Open-source Hedera Agent Kit plugin for T3N identity readiness, session auth, user-DID tracking, profile verification, and agent registration inspection.",
+  "author": "Terminal 3",
+  "license": "MIT",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "publishConfig": {
+    "access": "public"
+  },
+  "bin": {
+    "hedera-t3n-plugin": "./dist/cli/index.js"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    },
+    "./plugin": {
+      "types": "./dist/plugin.d.ts",
+      "import": "./dist/plugin.js",
+      "default": "./dist/plugin.js"
+    },
+    "./create-identity": {
+      "types": "./dist/createIdentity.d.ts",
+      "import": "./dist/createIdentity.js",
+      "default": "./dist/createIdentity.js"
+    },
+    "./register-agent-erc8004": {
+      "types": "./dist/registerAgentErc8004.d.ts",
+      "import": "./dist/registerAgentErc8004.js",
+      "default": "./dist/registerAgentErc8004.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "private": false,
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Terminal-3/hedera-t3n-plugin.git"
+  },
+  "bugs": {
+    "url": "https://github.com/Terminal-3/hedera-t3n-plugin/issues"
+  },
+  "homepage": "https://github.com/Terminal-3/hedera-t3n-plugin#readme",
+  "keywords": [
+    "hedera",
+    "agent-kit",
+    "plugin",
+    "t3n",
+    "identity",
+    "profile",
+    "session",
+    "registration"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "clean": "rimraf dist",
+    "lint": "eslint src tests scripts",
+    "lint:fix": "eslint src tests scripts --fix",
+    "test": "HEDERA_NETWORK=local vitest run",
+    "test:watch": "HEDERA_NETWORK=local vitest watch",
+    "test:integration": "HEDERA_NETWORK=testnet vitest run tests/integration",
+    "test:e2e": "HEDERA_NETWORK=testnet tsx tests/e2e/run-e2e.ts",
+    "create-identity": "tsx src/cli/create-identity.ts",
+    "ipfs-submit-agent-card-pinata": "tsx src/cli/ipfs-submit-agent-card-pinata.ts",
+    "register-agent-erc8004": "tsx src/cli/register-agent-erc8004.ts",
+    "pack:dry-run": "node scripts/pack-dry-run.js",
+    "pack:smoke-install": "node scripts/smoke-pack-install.js",
+    "validate": "pnpm lint && pnpm test && pnpm test:integration && pnpm build && pnpm run pack:dry-run && pnpm run pack:smoke-install",
+    "prepublishOnly": "pnpm run clean && pnpm run build",
+    "release": "node scripts/release.js release",
+    "release:tag-only": "node scripts/release.js tag-only",
+    "release:verify-version": "node scripts/release.js verify-version"
+  },
+  "files": [
+    "dist/**/*",
+    "config*.json",
+    ".env.example",
+    ".env.secret.pinata.example",
+    "README.md",
+    "OPEN_SOURCE_NOTES.md",
+    "RELEASE_CHECKLIST.md",
+    "OPEN_SOURCE_READINESS_MATRIX.md",
+    "LICENSE"
+  ],
+  "dependencies": {
+    "@noble/secp256k1": "^2.1.0",
+    "@terminal3/t3n-sdk": "0.2.1",
+    "bs58": "^5.0.0",
+    "dotenv": "^16.6.1",
+    "ethers": "^6.15.0",
+    "pinata": "^2.5.0",
+    "zod": "^3.25.76"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.19.0",
+    "@langchain/core": "^1.1.17",
+    "@langchain/langgraph": "^1.1.2",
+    "@langchain/ollama": "^1.2.1",
+    "@types/node": "^20.10.6",
+    "eslint": "^9.19.0",
+    "globals": "^17.3.0",
+    "langchain": "^1.2.6",
+    "rimraf": "^5.0.5",
+    "ts-node": "^10.9.2",
+    "tsx": "^4.21.0",
+    "typescript": "^5.4.2",
+    "typescript-eslint": "^8.55.0",
+    "vitest": "^1.3.1"
+  },
+  "peerDependencies": {
+    "@hashgraph/sdk": "^2.74.0",
+    "hedera-agent-kit": "^3.4.0"
+  },
+  "peerDependenciesMeta": {
+    "@hashgraph/sdk": {
+      "optional": false
+    },
+    "hedera-agent-kit": {
+      "optional": false
+    }
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "packageManager": "pnpm@9.15.9+sha512.68046141893c66fad01c079231128e9afb89ef87e2691d69e4d40eee228988295fd4682181bae55b58418c3a253bde65a505ec7c5f9403ece5cc3cd37dcf2531"
+}

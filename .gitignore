@@ -1,0 +1,36 @@
+# Aligned with trinity/.gitignore for shared env/editor/OS rules (plugin-specific paths below).
+
+# Dependencies & build output
+node_modules/
+dist/
+build/
+
+# Local environment (see also **/.env.secret.* below)
+.env
+.env.local
+tests/integration/.env
+
+# Secret env files anywhere in the tree; keep *.example tracked
+**/.env.secret.*
+!**/**.example
+
+# Logs
+*.log
+
+# Test / tooling output
+coverage/
+tests/e2e/artifacts/
+output/identities/
+config/identity/*.json
+
+# Editor & IDE
+.idea/
+.vscode/
+*.sublime-project
+*.sublime-workspace
+
+# OS
+.DS_Store
+
+# Packages
+*.tgz
