@@ -2,9 +2,20 @@
 
 ## Plugin Name
 
-`@terminal3/hedera-t3n-plugin` was built by Terminal 3 for T3N agent identity workflows. It enables Hedera Agent Kit builders to create local agent identities, open authenticated T3N sessions, track user DIDs, inspect profile-field availability, and inspect T3N plus Hedera registration state.
+`@terminal3/hedera-t3n-plugin` was built by Terminal 3 for T3N agent identity workflows. It gives Hedera Agent Kit builders a practical bridge into T3N so agents can create local identities, open authenticated T3N sessions, track user DIDs, inspect profile-field availability, and inspect T3N plus Hedera registration state.
 
 This open-source packaging pass keeps the existing user-DID, profile, session, and registration-inspection capabilities intact. The cleanup removes stale legacy compliance wording and private-package assumptions, not active runtime features.
+
+## T3N Context
+
+T3N is Terminal 3's runtime, identity, and trust layer for building verified application, agent, and user flows. In this plugin's scope, that shows up as T3N sessions, `did:t3n` identities, profile lookups, and agent registration flows.
+
+The purpose of this plugin is not to expose all of T3N. It packages the Hedera Agent Kit path into the parts of T3N that matter for local agent identity, authenticated sessions, profile-aware checks, and registration readback, so app builders do not need to wire that lifecycle themselves. Use it when your Hedera-based agent needs to:
+
+- create and validate a local T3N agent identity
+- authenticate into T3N and verify the session is still usable
+- work with stored user DIDs before profile checks
+- inspect whether an agent is registered across both T3N and Hedera
 
 ### Installation
 
