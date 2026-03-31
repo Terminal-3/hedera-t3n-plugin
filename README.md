@@ -73,6 +73,16 @@ _Identity readiness, session auth, user-DID tracking, profile inspection, and re
 
 The package ships a `hedera-t3n-plugin` binary.
 
+### Required setup before registration-dependent plugin usage
+
+If you plan to use registration inspection or registration-dependent flows with `@terminal3/hedera-t3n-plugin`, run these steps in order:
+
+1. Create a local identity (`create-identity`)
+2. Upload the public agent card to IPFS (`ipfs-submit-agent-card-pinata`)
+3. Register the agent on Hedera ERC-8004 (`register-agent-erc8004`)
+
+These correspond to the package scripts `create-identity`, `ipfs-submit-agent-card-pinata`, and `register-agent-erc8004` in `package.json`.
+
 ```bash
 hedera-t3n-plugin init
 hedera-t3n-plugin create-identity --env testnet --path ./output/identities/agent_identity.json
