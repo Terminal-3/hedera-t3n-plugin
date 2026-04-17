@@ -1,8 +1,9 @@
 import { ChatPromptTemplate } from "@langchain/core/prompts";
-import { Client, PrivateKey } from "@hashgraph/sdk";
+import { Client, PrivateKey } from "@hiero-ledger/sdk";
 import { AgentExecutor, createStructuredChatAgent } from "@langchain/classic/agents";
 import { BufferMemory } from "@langchain/classic/memory";
-import { AgentMode, HederaLangchainToolkit } from "hedera-agent-kit";
+import { AgentMode } from "@hashgraph/hedera-agent-kit";
+import { HederaLangchainToolkit } from "@hashgraph/hedera-agent-kit-langchain";
 import dotenv from "dotenv";
 import { hederaT3nPlugin } from "@terminal3/hedera-t3n-plugin";
 import { pull } from "langchain/hub";

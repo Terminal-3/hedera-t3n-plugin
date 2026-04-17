@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-import type { Context, Tool } from "hedera-agent-kit";
+import type { Context, Tool } from "@hashgraph/hedera-agent-kit";
 
 import { buildAuthAgentContext } from "../utils/auth-agent-context.js";
 import {

@@ -1,4 +1,4 @@
-import type { Context } from "hedera-agent-kit";
+import type { Context } from "@hashgraph/hedera-agent-kit";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("../../src/utils/auth-agent-context.js", () => ({

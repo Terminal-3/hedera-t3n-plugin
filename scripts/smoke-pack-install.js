@@ -53,7 +53,7 @@ try {
     ) + "\n"
   );
 
-  execFileSync(npmExecutable, ["install", "--no-audit", "--no-fund", tarballPath, "@hashgraph/sdk", "hedera-agent-kit"], {
+  execFileSync(npmExecutable, ["install", "--no-audit", "--no-fund", tarballPath, "@hiero-ledger/sdk", "@hashgraph/hedera-agent-kit", "@hashgraph/hedera-agent-kit-langchain"], {
     cwd: consumerDir,
     stdio: "inherit",
   });

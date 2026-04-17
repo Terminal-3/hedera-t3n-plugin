@@ -5,7 +5,7 @@
  * Outputs: Tool call data and agent response
  */
 
-import type { ResponseParserService } from "hedera-agent-kit";
+import type { ResponseParserService } from "@hashgraph/hedera-agent-kit-langchain";
 
 import type { AgentSetup } from "./agent-setup.js";
 

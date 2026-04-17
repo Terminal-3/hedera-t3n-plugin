@@ -1,6 +1,7 @@
-import { Client, PrivateKey } from "@hashgraph/sdk";
+import { Client, PrivateKey } from "@hiero-ledger/sdk";
 import { generateText, stepCountIs, wrapLanguageModel } from "ai";
-import { AgentMode, HederaAIToolkit } from "hedera-agent-kit";
+import { AgentMode } from "@hashgraph/hedera-agent-kit";
+import { HederaAIToolkit } from "@hashgraph/hedera-agent-kit-ai-sdk";
 import dotenv from "dotenv";
 import { hederaT3nPlugin } from "@terminal3/hedera-t3n-plugin";
 import prompts from "prompts";

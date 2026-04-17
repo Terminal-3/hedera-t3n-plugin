@@ -12,13 +12,14 @@
     "langchain:return-bytes-tool-calling-agent": "tsx return-bytes-tool-calling-agent.ts"
   },
   "dependencies": {
-    "@hashgraph/sdk": "^2.80.0",
+    "@hiero-ledger/sdk": "^2.82.0",
     "@langchain/classic": "^1.0.8",
     "@langchain/core": "^1.1.11",
     "@langchain/openai": "^1.2.1",
+    "@hashgraph/hedera-agent-kit": "^4.0.0",
+    "@hashgraph/hedera-agent-kit-langchain": "^1.0.0",
     "cheerio": "^1.1.2",
     "dotenv": "^17.2.3",
-    "hedera-agent-kit": "^3.8.0",
     "@terminal3/hedera-t3n-plugin": "file:../../..",
     "langchain": "^1.0.6",
     "prompts": "^2.4.2"
@@ -31,7 +32,7 @@
   },
   "pnpm": {
     "overrides": {
-      "@hashgraph/sdk": "^2.80.0"
+      "@hiero-ledger/sdk": "^2.82.0"
     }
   }
 }

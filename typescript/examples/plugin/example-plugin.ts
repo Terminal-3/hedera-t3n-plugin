@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-import type { Context, Plugin, Tool } from "hedera-agent-kit";
+import type { Context, Plugin, Tool } from "@hashgraph/hedera-agent-kit";
 import { hederaT3nPlugin } from "@terminal3/hedera-t3n-plugin";
 
 const createT3nBootstrapGuideTool = (_context: Context): Tool => ({
