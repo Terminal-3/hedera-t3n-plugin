@@ -11,7 +11,7 @@ This plugin enables `AI agents` to interact with [Terminal 3 Network (T3N)](http
 
 ## Installation
 
-`npm install @terminal3/hedera-t3n-plugin hedera-agent-kit @hashgraph/sdk`
+`npm install @terminal3/hedera-t3n-plugin @hashgraph/hedera-agent-kit @hashgraph/hedera-agent-kit-langchain @hiero-ledger/sdk`
 
 ## Prerequisite
 

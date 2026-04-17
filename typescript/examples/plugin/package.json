@@ -9,7 +9,7 @@
     "showcase": "tsx example-plugin.ts"
   },
   "dependencies": {
-    "hedera-agent-kit": "^3.8.0",
+    "@hashgraph/hedera-agent-kit": ">=4.0.0",
     "@terminal3/hedera-t3n-plugin": "file:../../..",
     "zod": "^3.25.76"
   },

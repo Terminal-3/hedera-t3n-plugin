@@ -3,20 +3,20 @@ import {
   Client,
   PrivateKey,
   Transaction,
-} from "@hashgraph/sdk";
+} from "@hiero-ledger/sdk";
 import { AgentExecutor, createToolCallingAgent } from "@langchain/classic/agents";
 import { BufferMemory } from "@langchain/classic/memory";
+import { AgentMode } from "@hashgraph/hedera-agent-kit";
 import {
-  AgentMode,
   HederaLangchainToolkit,
-  coreAccountPlugin,
-} from "hedera-agent-kit";
+} from "@hashgraph/hedera-agent-kit-langchain";
 import dotenv from "dotenv";
 import { hederaT3nPlugin } from "@terminal3/hedera-t3n-plugin";
 import prompts from "prompts";
 
 import { createChatModel, getChatModelConfig } from "./model.js";
 import { GUIDED_ACTION_TOOL_METHODS } from "../shared/guided-action-tools.js";
+import { coreAccountPlugin } from "@hashgraph/hedera-agent-kit/plugins";
 
 dotenv.config();
 

@@ -5,7 +5,7 @@
  * Outputs: Plugin instance with PRIVATE_DATA_PROCESSING and AUTH_AGENT_CONTEXT
  */
 
-import type { Plugin, Context } from "hedera-agent-kit";
+import type { Plugin, Context } from "@hashgraph/hedera-agent-kit";
 
 import { authAgentContextTool } from "./tools/auth-agent-context.js";
 import { privateDataProcessingTool } from "./tools/private-data-processing.js";

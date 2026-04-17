@@ -21,9 +21,9 @@
     "@ai-sdk/openai": "^3.0.41",
     "@ai-sdk/openai-compatible": "^2.0.35",
     "@ai-sdk/react": "^3.0.118",
-    "@hashgraph/sdk": "^2.80.0",
+    "@hiero-ledger/sdk": "^2.82.0",
     "ai": "^6.0.116",
-    "hedera-agent-kit": "^3.8.0",
+    "@hashgraph/hedera-agent-kit": ">=4.0.0",
     "@terminal3/hedera-t3n-plugin": "file:../../..",
     "next": "^16.1.6",
     "react": "^19.2.4",
@@ -44,7 +44,7 @@
   },
   "pnpm": {
     "overrides": {
-      "@hashgraph/sdk": "^2.80.0"
+      "@hiero-ledger/sdk": "^2.82.0"
     }
   }
 }

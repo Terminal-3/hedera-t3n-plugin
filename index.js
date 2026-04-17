@@ -1,10 +1,11 @@
-import { PrivateKey, Client } from "@hashgraph/sdk";
+import { PrivateKey, Client } from "@hiero-ledger/sdk";
 import { MemorySaver } from "@langchain/langgraph";
 import { ChatOllama } from "@langchain/ollama";
 import { ChatOpenAI } from "@langchain/openai";
 import { createAgent } from "langchain";
 
-import { AgentMode, HederaLangchainToolkit, ResponseParserService } from "hedera-agent-kit";
+import { AgentMode } from "@hashgraph/hedera-agent-kit";
+import { HederaLangchainToolkit, ResponseParserService } from "@hashgraph/hedera-agent-kit-langchain";
 
 import { hederaT3nPlugin } from "./dist/plugin.js";
 import { invokeAgentTool } from "./tests/e2e/helpers/tool-invocation.js";
