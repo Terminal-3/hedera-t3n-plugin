@@ -1,30 +1,27 @@
 # Open Source Notes
 
-`@terminal3/hedera-t3n-plugin` is the public Hedera Agent Kit plugin package for T3N agent identity workflows.
+## What Changed In 2.0.0
 
-## Scope
+- preserved the existing plugin runtime surface, including user-DID and profile-field tools
+- switched package publishing defaults from GitHub Packages-only metadata to public npm distribution
+- removed stale legacy KYC wording from release docs and readiness notes
+- added validation gates for lint, tests, build, pack, and tarball smoke-install checks
 
-- local agent identity creation
-- authenticated T3N session bootstrapping and validation
-- user-DID tracking for later profile checks
-- profile-field existence checks without exposing profile values
-- T3N plus Hedera agent-registration inspection
-- explicit CLI and programmatic helpers for agent-card upload and ERC-8004 registration
+## Migration Guidance
 
-## Intentional Boundaries
+If you are upgrading from an internal or GitHub-Packages-based install:
 
-- The plugin tools focus on readiness checks, session management, and registration readback.
-- Live publication of the agent card and ERC-8004 writes stay explicit through the CLI or programmatic APIs instead of hidden behind autonomous tool execution.
-- Local `HEDERA_NETWORK=local` support is intended for identity creation and fast test flows; live registration remains testnet/mainnet only.
+1. Replace GitHub Packages auth and scoped-registry setup with the public npm install command.
+2. Keep existing tool allowlists; no active runtime tools were removed in this release.
+3. Keep registration as an explicit CLI or SDK action via `registerAgentErc8004(...)`.
+4. Update any local docs or prompts that still describe the user-DID/profile flows as legacy KYC features.
 
-## Public Package Expectations
+## Publish And Register Playbook
 
-- Requires host applications to provide `hedera-agent-kit` and `@hashgraph/sdk`.
-- Requires `AGENT_IDENTITY_CONFIG_PATH` for tools that read the local identity file.
-- Requires extra credentials only for the flows that truly need them, such as Hedera registration or Pinata upload.
-- Keeps runtime configuration overrideable through environment variables for local CCF, staging, and production-like testing.
-
-## Submission Notes
-
-- The Hedera Agent Kit submission requires listing the plugin in both `README.md` and `docs/PLUGINS.md` of the upstream `hedera-agent-kit-js` repo.
-- The plugin listing should reference the public source repository, npm package URL, and the tested public package version.
+1. Run `pnpm validate`.
+2. Publish with `pnpm release`.
+3. Push the generated release tag.
+4. Open the follow-up docs updates needed by Hedera Agent Kit:
+   - add the plugin to `docs/PLUGINS.md`
+   - add the same listing to the Hedera Agent Kit root README third-party plugins section
+5. Share the README and npm package URL when requesting plugin review or listing updates.

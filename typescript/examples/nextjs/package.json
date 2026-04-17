@@ -10,7 +10,11 @@
     "prebuild": "pnpm --dir ../../.. build",
     "build": "next build",
     "start": "dotenv -e .env -- next start",
+    "pretypecheck": "pnpm --dir ../../.. build",
+    "typecheck": "tsc --noEmit",
+    "pretest": "pnpm --dir ../../.. build",
     "test": "vitest run",
+    "prelint": "pnpm --dir ../../.. build",
     "lint": "eslint . --max-warnings=0"
   },
   "dependencies": {
@@ -37,5 +41,10 @@
     "typescript": "^5.9.3",
     "typescript-eslint": "^8.55.0",
     "vitest": "^4.0.18"
+  },
+  "pnpm": {
+    "overrides": {
+      "@hashgraph/sdk": "^2.80.0"
+    }
   }
 }

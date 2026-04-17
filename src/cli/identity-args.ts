@@ -11,6 +11,10 @@
 import type { NetworkTier } from "../createIdentity.js";
 import { getIdentityEnvironment } from "../utils/env.js";
 import { normalizeOutputPath } from "../utils/storage.js";
+import {
+  assertEnumFlagValue,
+  tryReadFlag,
+} from "./arg-utils.js";
 
 const NETWORK_TIERS: NetworkTier[] = ["local", "testnet", "mainnet"];
 
@@ -36,58 +40,33 @@ export function parseCreateIdentityArgs(
   let networkTier: NetworkTier = getIdentityEnvironment(env);
   let pathArg: string | undefined;
 
-  for (let i = 0; i < argv.length; i++) {
+  for (let i = 0; i < argv.length; ) {
     const arg = argv[i];
-    if (arg.startsWith("--env=")) {
-      const value = arg.slice("--env=".length).trim();
-      if (!value) {
-        throw new Error("Missing value for --env");
-      }
-      if (!NETWORK_TIERS.includes(value as NetworkTier)) {
-        throw new Error(
-          `Invalid value for --env: "${value}". Supported values: ${NETWORK_TIERS.join(", ")}`
-        );
-      }
-      networkTier = value as NetworkTier;
+
+    const envMatch = tryReadFlag(argv, i, "--env");
+    if (envMatch) {
+      networkTier = assertEnumFlagValue("--env", envMatch.value, NETWORK_TIERS);
+      i += envMatch.consumedCount;
       continue;
     }
-    if (arg === "--env") {
-      const next = argv[i + 1];
-      if (!next || next.startsWith("-")) {
-        throw new Error("Missing value for --env");
-      }
-      if (!NETWORK_TIERS.includes(next as NetworkTier)) {
-        throw new Error(
-          `Invalid value for --env: "${next}". Supported values: ${NETWORK_TIERS.join(", ")}`
-        );
-      }
-      networkTier = next as NetworkTier;
-      i += 1;
+
+    const pathMatch = tryReadFlag(argv, i, "--path", "-p");
+    if (pathMatch) {
+      pathArg = pathMatch.value;
+      i += pathMatch.consumedCount;
       continue;
     }
-    if (arg.startsWith("--path=")) {
-      const value = arg.slice("--path=".length);
-      if (!value) {
-        throw new Error("Missing value for --path");
-      }
-      pathArg = value;
-      continue;
-    }
-    if (arg === "--path" || arg === "-p") {
-      const next = argv[i + 1];
-      if (!next || next.startsWith("-")) {
-        throw new Error("Missing value for --path");
-      }
-      pathArg = next;
-      i += 1;
-      continue;
-    }
+
     if (arg.startsWith("--agent-uri=") || arg === "--agent-uri") {
       throw new Error(
         "--agent-uri is no longer supported by create-identity. " +
           "Run `pnpm register-agent-erc8004 --agent-uri <uri>` after identity creation."
       );
     }
+
+    // Skip unknown positional arguments or flags for now, 
+    // or we could throw an error if we wanted to be strict.
+    i++;
   }
 
   return { networkTier, pathArg };

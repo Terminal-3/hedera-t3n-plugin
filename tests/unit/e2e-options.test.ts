@@ -79,11 +79,11 @@ describe("stripE2eOptionArgs", () => {
         "--local-ccf",
         "--agent-card-gateway-url",
         "https://example.com/agent_card.json",
-        "tests/e2e/e2e-ollama-tool.e2e.ts",
+        "tests/e2e/auth-agent-context.e2e.ts",
       ])
     ).toEqual([
       "--reporter=verbose",
-      "tests/e2e/e2e-ollama-tool.e2e.ts",
+      "tests/e2e/auth-agent-context.e2e.ts",
     ]);
   });
 });

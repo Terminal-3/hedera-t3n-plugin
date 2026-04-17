@@ -9,13 +9,7 @@ export interface ToolResult {
   humanMessage: string;
 }
 
-/**
- * Returns a string message from a caught value (Error or unknown).
- * Single source of truth for error-to-message conversion in tool details and user-facing messages.
- */
-export function messageFromError(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
-}
+export { messageFromError } from "./error-utils.js";
 
 /**
  * Build a standardised error result for a tool.
@@ -33,4 +27,26 @@ export function buildErrorResult(
     raw: { success: false, error, ...extra },
     humanMessage: humanMessage ?? error,
   };
+}
+
+export function parseToolOutput(rawOutput: string): ToolResult {
+  const trimmed = rawOutput?.trim() ?? "";
+  if (!trimmed || trimmed.startsWith("Error:") || trimmed.startsWith("error:")) {
+    return buildErrorResult(trimmed || rawOutput);
+  }
+
+  try {
+    const parsed = JSON.parse(rawOutput) as unknown;
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+      return buildErrorResult(rawOutput);
+    }
+
+    const obj = parsed as { raw?: Record<string, unknown>; humanMessage?: string };
+    return {
+      raw: obj.raw ?? {},
+      humanMessage: obj.humanMessage ?? "",
+    };
+  } catch {
+    return buildErrorResult(rawOutput);
+  }
 }

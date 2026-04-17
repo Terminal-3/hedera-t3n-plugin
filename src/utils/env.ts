@@ -116,6 +116,14 @@ export function loadDotenvSafe(options?: dotenv.DotenvConfigOptions): void {
   restorePreserved();
 }
 
+function getEnvString(
+  env: NodeJS.ProcessEnv | undefined,
+  key: string
+): string | undefined {
+  const value = (env ?? process.env)[key]?.trim();
+  return value === "" ? undefined : value;
+}
+
 const HEDERA_NETWORKS = ["local", "testnet", "mainnet"] as const;
 export type HederaNetwork = (typeof HEDERA_NETWORKS)[number];
 
@@ -131,7 +139,7 @@ export type HederaNetwork = (typeof HEDERA_NETWORKS)[number];
 export function getHederaNetworkExplicit(
   env?: NodeJS.ProcessEnv
 ): HederaNetwork | undefined {
-  const v = (env ?? process.env).HEDERA_NETWORK?.toLowerCase();
+  const v = getEnvString(env, "HEDERA_NETWORK")?.toLowerCase();
   if (v && HEDERA_NETWORKS.includes(v as HederaNetwork)) {
     return v as HederaNetwork;
   }
@@ -168,7 +176,7 @@ export function isT3nLocal(env?: NodeJS.ProcessEnv): boolean {
 export type T3nLocalBackend = "mock" | "ccf";
 
 export function getT3nLocalBackend(env?: NodeJS.ProcessEnv): T3nLocalBackend {
-  const value = (env ?? process.env).T3N_LOCAL_BACKEND?.trim().toLowerCase();
+  const value = getEnvString(env, "T3N_LOCAL_BACKEND")?.toLowerCase();
   if (value === "ccf") return "ccf";
   return "mock";
 }
@@ -178,29 +186,25 @@ export function shouldUseLiveLocalT3nBackend(env?: NodeJS.ProcessEnv): boolean {
 }
 
 export function getT3nApiUrlOverride(env?: NodeJS.ProcessEnv): string | undefined {
-  const value = (env ?? process.env).T3N_API_URL?.trim();
-  return value === "" ? undefined : value;
+  return getEnvString(env, "T3N_API_URL");
 }
 
 export function getT3nRuntimeApiUrlOverride(
   env?: NodeJS.ProcessEnv
 ): string | undefined {
-  const value = (env ?? process.env).T3N_RUNTIME_API_URL?.trim();
-  return value === "" ? undefined : value;
+  return getEnvString(env, "T3N_RUNTIME_API_URL");
 }
 
 export function getT3nMlKemPublicKeyOverride(
   env?: NodeJS.ProcessEnv
 ): string | undefined {
-  const value = (env ?? process.env).T3N_ML_KEM_PUBLIC_KEY?.trim();
-  return value === "" ? undefined : value;
+  return getEnvString(env, "T3N_ML_KEM_PUBLIC_KEY");
 }
 
 export function getT3nMlKemPublicKeyFileOverride(
   env?: NodeJS.ProcessEnv
 ): string | undefined {
-  const value = (env ?? process.env).T3N_ML_KEM_PUBLIC_KEY_FILE?.trim();
-  return value === "" ? undefined : value;
+  return getEnvString(env, "T3N_ML_KEM_PUBLIC_KEY_FILE");
 }
 
 /**
@@ -235,8 +239,7 @@ export function getIdentityEnvironment(env?: NodeJS.ProcessEnv): IdentityEnviron
  * @returns Config file path or undefined if unset/empty
  */
 export function getAgentIdentityConfigPath(env?: NodeJS.ProcessEnv): string | undefined {
-  const v = (env ?? process.env).AGENT_IDENTITY_CONFIG_PATH?.trim();
-  return v === "" ? undefined : v;
+  return getEnvString(env, "AGENT_IDENTITY_CONFIG_PATH");
 }
 
 /**
@@ -249,8 +252,7 @@ export function getAgentIdentityConfigPath(env?: NodeJS.ProcessEnv): string | un
  * @returns Account ID or undefined if unset/empty
  */
 export function getHederaAccountId(env?: NodeJS.ProcessEnv): string | undefined {
-  const v = (env ?? process.env).HEDERA_ACCOUNT_ID?.trim();
-  return v === "" ? undefined : v;
+  return getEnvString(env, "HEDERA_ACCOUNT_ID");
 }
 
 /**
@@ -260,8 +262,7 @@ export function getHederaAccountId(env?: NodeJS.ProcessEnv): string | undefined 
  * @returns Private key or undefined if unset/empty
  */
 export function getHederaPrivateKey(env?: NodeJS.ProcessEnv): string | undefined {
-  const v = (env ?? process.env).HEDERA_PRIVATE_KEY?.trim();
-  return v === "" ? undefined : v;
+  return getEnvString(env, "HEDERA_PRIVATE_KEY");
 }
 
 /**
@@ -276,11 +277,10 @@ export function getHederaPrivateKey(env?: NodeJS.ProcessEnv): string | undefined
 export function getHederaIdentityRegistryAddress(
   env?: NodeJS.ProcessEnv
 ): string | undefined {
-  const source = env ?? process.env;
-  const v =
-    source.HEDERA_IDENTITY_REGISTRY_ADDRESS?.trim() ??
-    source.HEDERA_IDENTITY_REGISTRY_ADDRES?.trim();
-  return v === "" ? undefined : v;
+  return (
+    getEnvString(env, "HEDERA_IDENTITY_REGISTRY_ADDRESS") ??
+    getEnvString(env, "HEDERA_IDENTITY_REGISTRY_ADDRES")
+  );
 }
 
 /**

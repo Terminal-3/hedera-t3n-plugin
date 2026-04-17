@@ -34,7 +34,7 @@ const registerDidT3nMock = vi.mocked(registerDidT3n);
 const assertHederaRegistrationReadyMock = vi.mocked(assertHederaRegistrationReady);
 const registerHederaAgentIdentityMock = vi.mocked(registerHederaAgentIdentity);
 const TEST_PRIVATE_KEY = `0x${"1".repeat(64)}`;
-const TEST_DID = "did:t3n:a:abc123def4567890";
+const TEST_DID = "did:t3n:bca583d0718b5567627cf92858310d690e7ae61b";
 const TEST_OWNER = `0x${"2".repeat(40)}`;
 const TEST_IDENTITY_REGISTRY_ADDRESS = "0x1111111111111111111111111111111111111111";
 
@@ -53,11 +53,11 @@ async function writeIdentityConfig(
       {
         version: 1,
         created_at: "2026-03-06T00:00:00.000Z",
-        did_key: "did:key:z6Mkk11111111111111111111111111111111111111111111",
         did_t3n: TEST_DID,
         hedera_wallet: TEST_OWNER,
         network_tier: networkTier,
         private_key: TEST_PRIVATE_KEY,
+        public_key: "0x" + "b".repeat(66),
         ...(options.agentCardGatewayUrl
           ? { agent_card_gateway_url: options.agentCardGatewayUrl }
           : {}),

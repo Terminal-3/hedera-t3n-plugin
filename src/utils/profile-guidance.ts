@@ -2,41 +2,30 @@ import {
   getNetworkTierConfigFilename,
   loadPluginNetworkConfig,
 } from "./network-config.js";
+import {
+  isProfileAuthorizationErrorMessage,
+  isProfileMissingErrorMessage,
+} from "./error-utils.js";
 import { buildErrorResult, type ToolResult } from "./tool-result.js";
+import { type Environment as NetworkTier } from "./environment.js";
 
-type NetworkTier = "local" | "testnet" | "mainnet";
-
-type UnsupportedField = {
+export type UnsupportedField = {
   field: string;
   reason: string;
 };
 
-type GuidanceExtra = {
+export type GuidanceExtra = {
   allSupportedFields?: string[];
   did?: string;
   targetDid?: string;
   unsupportedFields: UnsupportedField[];
 };
 
-type DashboardUrls = {
+export type DashboardUrls = {
   profileUrl?: string;
   onboardingUrl?: string;
   agentsUrl?: string;
 };
-
-const PROFILE_MISSING_PATTERNS = [
-  "profile is required",
-  "profile is missing",
-  "profile does not exist",
-  "user profile is required",
-];
-
-const PROFILE_AUTHORIZATION_PATTERNS = [
-  "authorization error",
-  "authorization denied",
-  "unauthorized to access pii",
-  "not authorized to access",
-];
 
 function buildDashboardUrl(baseUrl: string, path: string): string {
   const normalizedBaseUrl = baseUrl.replace(/\/$/, "");
@@ -98,19 +87,10 @@ export async function loadDashboardUrls(
   }
 }
 
-export function isProfileMissingErrorMessage(message: string): boolean {
-  const normalizedMessage = message.trim().toLowerCase();
-  return PROFILE_MISSING_PATTERNS.some((pattern) =>
-    normalizedMessage.includes(pattern)
-  );
-}
-
-export function isProfileAuthorizationErrorMessage(message: string): boolean {
-  const normalizedMessage = message.trim().toLowerCase();
-  return PROFILE_AUTHORIZATION_PATTERNS.some((pattern) =>
-    normalizedMessage.includes(pattern)
-  );
-}
+export {
+  isProfileAuthorizationErrorMessage,
+  isProfileMissingErrorMessage,
+};
 
 export function buildProfileNotFoundResult({
   extra,

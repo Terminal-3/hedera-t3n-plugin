@@ -2,7 +2,7 @@ import { existsSync, readFileSync } from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
 
-export type DemoModelProvider = "ollama" | "openai" | "openai-compatible";
+export type DemoModelProvider = "ollama" | "openai" | "openai-compatible" | "groq";
 
 export type DemoModelConfig = {
   model: string;
@@ -85,13 +85,14 @@ function parseProvider(value: string | undefined): DemoModelProvider {
   if (
     normalized === "ollama" ||
     normalized === "openai" ||
-    normalized === "openai-compatible"
+    normalized === "openai-compatible" ||
+    normalized === "groq"
   ) {
     return normalized;
   }
 
   throw new Error(
-    `Unsupported DEMO_MODEL_PROVIDER "${normalized}". Expected ollama, openai, or openai-compatible.`
+    `Unsupported DEMO_MODEL_PROVIDER "${normalized}". Expected ollama, openai, groq, or openai-compatible.`
   );
 }
 
@@ -104,7 +105,9 @@ export function getDemoModelConfig(): DemoModelConfig {
   loadPluginEnv();
 
   const provider = parseProvider(process.env.DEMO_MODEL_PROVIDER);
-  const model = getOptionalEnv("DEMO_MODEL") ?? "qwen2.5";
+  const model =
+    getOptionalEnv("DEMO_MODEL") ??
+    (provider === "groq" ? "llama-3.3-70b-versatile" : "gemma4:latest");
   const ollamaBaseUrl = normalizeBaseUrl(
     getOptionalEnv("OLLAMA_BASE_URL") ?? "http://127.0.0.1:11434"
   );
@@ -115,6 +118,8 @@ export function getDemoModelConfig(): DemoModelConfig {
     providerBaseUrl:
       provider === "ollama"
         ? ensureV1Path(ollamaBaseUrl)
+        : provider === "groq"
+          ? normalizeBaseUrl(getOptionalEnv("GROQ_BASE_URL") ?? "https://api.groq.com/openai/v1")
         : provider === "openai-compatible"
           ? normalizeBaseUrl(
               getOptionalEnv("OPENAI_COMPATIBLE_BASE_URL") ?? ensureV1Path(ollamaBaseUrl)
@@ -123,6 +128,8 @@ export function getDemoModelConfig(): DemoModelConfig {
     providerApiKey:
       provider === "ollama"
         ? getOptionalEnv("OPENAI_COMPATIBLE_API_KEY") ?? "ollama"
+        : provider === "groq"
+          ? getOptionalEnv("GROQ_API_KEY")
         : provider === "openai-compatible"
           ? getOptionalEnv("OPENAI_COMPATIBLE_API_KEY")
           : getOptionalEnv("OPENAI_API_KEY"),
@@ -135,6 +142,12 @@ export function getReadyDemoModelConfig(): DemoModelConfig {
   if (config.provider === "openai" && !config.providerApiKey) {
     throw new Error(
       "OPENAI_API_KEY is missing. Set OPENAI_API_KEY or switch DEMO_MODEL_PROVIDER=ollama."
+    );
+  }
+
+  if (config.provider === "groq" && !config.providerApiKey) {
+    throw new Error(
+      "GROQ_API_KEY is missing. Set GROQ_API_KEY or switch DEMO_MODEL_PROVIDER to ollama/openai."
     );
   }
 

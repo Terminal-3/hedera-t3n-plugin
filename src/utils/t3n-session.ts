@@ -1,27 +1,17 @@
 import type { T3nClient } from "@terminal3/t3n-sdk";
 import {
-  T3nClient as T3nClientClass,
-  SessionStatus,
-  createEthAuthInput,
-  createRandomHandler,
   eth_get_address,
-  loadWasmComponent,
-  metamask_sign,
-  setEnvironment,
+  SessionStatus,
 } from "@terminal3/t3n-sdk";
 
 import {
-  readAgentIdentityConfig,
-  resolveAgentIdentityConfigPath,
-  validateAgentIdentityConfig,
+  loadIdentityOrThrow,
 } from "./agent-identity-config.js";
 import { isTestEnvironment, shouldUseLiveLocalT3nBackend } from "./env.js";
-import { createConfiguredMlKemPublicKeyHandler } from "./t3n-ml-kem.js";
 import {
-  authenticateT3nClientWithEthDidSuffix,
+  createAuthenticatedT3nClient,
   resolveT3nBaseUrl,
 } from "./t3n.js";
-import { validateStoredCredentials } from "./validation.js";
 
 import type { Environment } from "./environment.js";
 
@@ -43,10 +33,6 @@ type LoadedIdentityCredentials = {
 
 type MockExecuteRequest = {
   function_name: string;
-};
-
-type T3nClientWithAuthenticate = T3nClient & {
-  authenticate(input: unknown): Promise<{ toString(): string }>;
 };
 
 export type T3nSessionState =
@@ -71,21 +57,6 @@ export type CreateT3nSessionResult = {
 };
 
 let currentSession: StoredSession | null = null;
-
-function inferSdkEnvironment(baseUrl: string): "local" | "staging" | "production" {
-  const normalized = baseUrl.toLowerCase();
-  if (
-    normalized.includes("localhost") ||
-    normalized.includes("127.0.0.1") ||
-    normalized.includes(":3000")
-  ) {
-    return "local";
-  }
-  if (normalized.includes("staging") || normalized.includes("stg")) {
-    return "staging";
-  }
-  return "production";
-}
 
 function shouldUseMockSession(env: NodeJS.ProcessEnv): boolean {
   if (shouldUseLiveLocalT3nBackend(env)) {
@@ -119,44 +90,15 @@ function createMockT3nClient(did: string): T3nClient {
 async function loadIdentityCredentials(
   env: NodeJS.ProcessEnv = process.env
 ): Promise<LoadedIdentityCredentials> {
-  const previousIdentityPath = process.env.AGENT_IDENTITY_CONFIG_PATH;
-  if (env.AGENT_IDENTITY_CONFIG_PATH !== undefined) {
-    process.env.AGENT_IDENTITY_CONFIG_PATH = env.AGENT_IDENTITY_CONFIG_PATH;
-  }
-
-  const resolvedPathResult = resolveAgentIdentityConfigPath();
-
-  if (previousIdentityPath !== undefined) {
-    process.env.AGENT_IDENTITY_CONFIG_PATH = previousIdentityPath;
-  } else if (env.AGENT_IDENTITY_CONFIG_PATH !== undefined) {
-    delete process.env.AGENT_IDENTITY_CONFIG_PATH;
-  }
-  if (!resolvedPathResult.ok) {
-    throw new Error(resolvedPathResult.humanMessage);
-  }
-
-  const readResult = await readAgentIdentityConfig(resolvedPathResult.path);
-  if (!readResult.ok) {
-    throw new Error(readResult.humanMessage);
-  }
-  if (!readResult.data) {
-    throw new Error(
-      `Identity configuration at ${resolvedPathResult.path} is empty. Run \`pnpm create-identity\` first.`
-    );
-  }
-
-  const validateResult = validateAgentIdentityConfig(readResult.data, readResult.path);
-  if (!validateResult.ok) {
-    throw new Error(validateResult.humanMessage);
-  }
-
-  const credentials = validateStoredCredentials(readResult.data);
+  const { path, credentials } = await loadIdentityOrThrow({
+    env,
+  });
 
   return {
     did: credentials.did_t3n,
     privateKey: credentials.private_key,
     networkTier: credentials.network_tier,
-    identityPath: resolvedPathResult.path,
+    identityPath: path,
   };
 }
 
@@ -166,41 +108,17 @@ async function createAuthenticatedClient(
   env: NodeJS.ProcessEnv
 ): Promise<{ client: T3nClient; did: string; baseUrl: string }> {
   const baseUrl = await resolveT3nBaseUrl(networkTier, { env });
-  setEnvironment(inferSdkEnvironment(baseUrl));
-
-  const wasmComponent = await loadWasmComponent();
   const address = eth_get_address(privateKey);
-  const handlers = {
-    EthSign: metamask_sign(address, undefined, privateKey),
-    MlKemPublicKey: createConfiguredMlKemPublicKeyHandler(env),
-    Random: createRandomHandler(),
-  };
 
-  const client = new T3nClientClass({
+  const { client, did } = await createAuthenticatedT3nClient({
+    privateKey,
+    address,
     baseUrl,
-    wasmComponent,
-    timeout: 30000,
-    handlers,
+    env,
+    fallbackT3nEnv: "production",
   });
 
-  await client.handshake();
-  let did: { toString(): string };
-  try {
-    did = await (client as T3nClientWithAuthenticate).authenticate(createEthAuthInput(address));
-  } catch {
-    const fallbackDid = await authenticateT3nClientWithEthDidSuffix(client, address);
-    did = { toString: () => fallbackDid };
-  }
-
-  if (!client.isAuthenticated()) {
-    throw new Error("Authentication failed: client is not authenticated");
-  }
-
-  return {
-    client,
-    did: did.toString(),
-    baseUrl,
-  };
+  return { client, did, baseUrl };
 }
 
 export function clearT3nSession(): void {
@@ -208,7 +126,7 @@ export function clearT3nSession(): void {
 }
 
 export function resetT3nSessionStateForTests(): void {
-  currentSession = null;
+  clearT3nSession();
 }
 
 export function getValidatedT3nSessionState(): T3nSessionState {

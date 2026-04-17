@@ -1,7 +1,5 @@
 import {
-  readAgentIdentityConfig,
-  resolveAgentIdentityConfigPath,
-  validateAgentIdentityConfig,
+  loadIdentityOrThrow,
 } from "./agent-identity-config.js";
 import {
   readHederaAgentRegistrationByAgentId,
@@ -13,8 +11,14 @@ import {
   fetchAgentViaCcfAction,
   type AgentRegistryRecord,
 } from "./t3n.js";
-import { validateStoredCredentials } from "./validation.js";
-
+import {
+  isHederaRecordNotFoundError,
+} from "./error-utils.js";
+import {
+  isRecord,
+  readNonEmptyString,
+  readPositiveInteger,
+} from "./validation.js";
 import type {
   StoredCredentials,
   StoredHederaRegistrationMetadata,
@@ -49,29 +53,6 @@ export interface CurrentAgentRegistrationState {
     agentId?: string;
     txHash?: string;
   };
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
-}
-
-function readNonEmptyString(record: Record<string, unknown>, key: string): string | undefined {
-  const value = record[key];
-  if (typeof value !== "string") {
-    return undefined;
-  }
-  const normalized = value.trim();
-  return normalized === "" ? undefined : normalized;
-}
-
-function readPositiveInteger(
-  record: Record<string, unknown>,
-  key: string
-): number | undefined {
-  const value = record[key];
-  return typeof value === "number" && Number.isInteger(value) && value > 0
-    ? value
-    : undefined;
 }
 
 function readHederaRegistrationMetadata(data: unknown):
@@ -127,65 +108,21 @@ function readHederaRegistrationMetadata(data: unknown):
   };
 }
 
-function messageFromError(error: unknown): string {
-  return error instanceof Error && error.message ? error.message : String(error);
-}
-
-function isHederaRecordNotFoundError(error: unknown): boolean {
-  const message = messageFromError(error).toLowerCase();
-
-  return (
-    message.includes("transaction receipt not found") ||
-    message.includes("registered or uriupdated event not found") ||
-    message.includes("registered event not found") ||
-    message.includes("nonexistent token") ||
-    message.includes("owner query for nonexistent token") ||
-    message.includes("erc721nonexistenttoken") ||
-    message.includes("invalid token id")
-  );
-}
 
 async function loadCurrentAgentIdentity(): Promise<{
   rawData: Record<string, unknown>;
   credentials: StoredCredentials;
   network: Exclude<Environment, "local">;
 }> {
-  const resolvedPathResult = resolveAgentIdentityConfigPath();
-  if (!resolvedPathResult.ok) {
-    throw new Error(resolvedPathResult.humanMessage);
-  }
-
-  const readResult = await readAgentIdentityConfig(resolvedPathResult.path);
-  if (!readResult.ok) {
-    throw new Error(readResult.humanMessage);
-  }
-  if (!readResult.data) {
-    throw new Error(
-      `Identity configuration at ${resolvedPathResult.path} is empty. Run \`pnpm create-identity\` first.`
-    );
-  }
-  if (!isRecord(readResult.data)) {
-    throw new Error(
-      `Identity configuration at ${resolvedPathResult.path} must be a JSON object.`
-    );
-  }
-
-  const validateResult = validateAgentIdentityConfig(readResult.data, readResult.path);
-  if (!validateResult.ok) {
-    throw new Error(validateResult.humanMessage);
-  }
-
-  const credentials = validateStoredCredentials(readResult.data);
-  if (credentials.network_tier === "local") {
-    throw new Error(
-      "Agent registration lookup does not support HEDERA_NETWORK=local. Use testnet or mainnet."
-    );
-  }
+  const { data, credentials } = await loadIdentityOrThrow({
+    disallowLocalMessage:
+      "Agent registration lookup does not support HEDERA_NETWORK=local. Use testnet or mainnet.",
+  });
 
   return {
-    rawData: readResult.data,
+    rawData: data,
     credentials,
-    network: credentials.network_tier,
+    network: credentials.network_tier as Exclude<Environment, "local">,
   };
 }
 

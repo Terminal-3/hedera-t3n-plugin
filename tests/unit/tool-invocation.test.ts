@@ -7,6 +7,24 @@ type MockResponse = {
   messages: Array<{ role: string; content: string }>;
 };
 
+type ParsedToolCall = {
+  toolName: string;
+  parsedData: { raw: { success: boolean } };
+};
+
+type TestAgent = Parameters<typeof invokeAgentTool>[0]["agent"];
+type TestResponseParser = Parameters<typeof invokeAgentTool>[0]["responseParser"];
+
+function createTestAgent(invoke: (input: unknown, options: unknown) => Promise<MockResponse>): TestAgent {
+  return { invoke } as unknown as TestAgent;
+}
+
+function createTestResponseParser(
+  parseNewToolMessages: (response: MockResponse) => ParsedToolCall[]
+): TestResponseParser {
+  return { parseNewToolMessages } as unknown as TestResponseParser;
+}
+
 function createResponse(id: string, messageCount = 1): MockResponse {
   return {
     id,
@@ -19,12 +37,12 @@ function createResponse(id: string, messageCount = 1): MockResponse {
 
 describe("invokeAgentTool strict invocation policy", () => {
   it("passes when exactly one matching tool call is captured", async () => {
-    const invoke = vi.fn(async () => createResponse("single"));
+    const invoke = vi.fn(() => Promise.resolve(createResponse("single")));
     const parseNewToolMessages = vi.fn((response: MockResponse) => {
       if (response.id === "single") {
         return [
           {
-            toolName: "CREATE_T3N_AUTH_SESSION",
+            toolName: "AUTH_AGENT_CONTEXT",
             parsedData: { raw: { success: true } },
           },
         ];
@@ -33,103 +51,103 @@ describe("invokeAgentTool strict invocation policy", () => {
     });
 
     const result = await invokeAgentTool({
-      agent: { invoke } as any,
-      responseParser: { parseNewToolMessages } as any,
+      agent: createTestAgent(invoke),
+      responseParser: createTestResponseParser(parseNewToolMessages),
       threadId: "thread-single",
-      userPrompt: "Create session",
-      expectedToolNames: ["CREATE_T3N_AUTH_SESSION"],
-      expectedToolLabel: "CREATE_T3N_AUTH_SESSION",
+      userPrompt: "Inspect readiness",
+      expectedToolNames: ["AUTH_AGENT_CONTEXT"],
+      expectedToolLabel: "AUTH_AGENT_CONTEXT",
       requireExactlyOneMatchingToolCall: true,
       disallowUnexpectedToolCalls: true,
     });
 
-    expect(result.toolCall.toolName).toBe("CREATE_T3N_AUTH_SESSION");
+    expect(result.toolCall.toolName).toBe("AUTH_AGENT_CONTEXT");
     expect(invoke).toHaveBeenCalledTimes(1);
   });
 
   it("fails when more than one matching tool call is captured", async () => {
-    const invoke = vi.fn(async () => createResponse("multiple", 3));
+    const invoke = vi.fn(() => Promise.resolve(createResponse("multiple", 3)));
     const parseNewToolMessages = vi.fn(() => [
       {
-        toolName: "CREATE_T3N_AUTH_SESSION",
+        toolName: "AUTH_AGENT_CONTEXT",
         parsedData: { raw: { success: true } },
       },
       {
-        toolName: "CREATE_T3N_AUTH_SESSION",
+        toolName: "AUTH_AGENT_CONTEXT",
         parsedData: { raw: { success: true } },
       },
     ]);
 
     await expect(
       invokeAgentTool({
-        agent: { invoke } as any,
-        responseParser: { parseNewToolMessages } as any,
+        agent: createTestAgent(invoke),
+        responseParser: createTestResponseParser(parseNewToolMessages),
         threadId: "thread-multiple",
-        userPrompt: "Create session",
-        expectedToolNames: ["CREATE_T3N_AUTH_SESSION"],
-        expectedToolLabel: "CREATE_T3N_AUTH_SESSION",
+        userPrompt: "Inspect readiness",
+        expectedToolNames: ["AUTH_AGENT_CONTEXT"],
+        expectedToolLabel: "AUTH_AGENT_CONTEXT",
         requireExactlyOneMatchingToolCall: true,
       })
     ).rejects.toThrow("Expected exactly one matching tool call, but captured 2.");
   });
 
   it("fails when unexpected tool calls are captured in strict mode", async () => {
-    const invoke = vi.fn(async () => createResponse("unexpected", 3));
+    const invoke = vi.fn(() => Promise.resolve(createResponse("unexpected", 3)));
     const parseNewToolMessages = vi.fn(() => [
       {
-        toolName: "ADD_USER_DID",
+        toolName: "PRIVATE_DATA_PROCESSING",
         parsedData: { raw: { success: true } },
       },
       {
-        toolName: "GET_USER_DID",
+        toolName: "AUTH_AGENT_CONTEXT",
         parsedData: { raw: { success: true } },
       },
     ]);
 
     await expect(
       invokeAgentTool({
-        agent: { invoke } as any,
-        responseParser: { parseNewToolMessages } as any,
+        agent: createTestAgent(invoke),
+        responseParser: createTestResponseParser(parseNewToolMessages),
         threadId: "thread-unexpected",
-        userPrompt: "Store did",
-        expectedToolNames: ["ADD_USER_DID"],
-        expectedToolLabel: "ADD_USER_DID",
+        userPrompt: "Run private data processing",
+        expectedToolNames: ["PRIVATE_DATA_PROCESSING"],
+        expectedToolLabel: "PRIVATE_DATA_PROCESSING",
         requireExactlyOneMatchingToolCall: true,
         disallowUnexpectedToolCalls: true,
       })
-    ).rejects.toThrow("Captured unexpected tool call(s): GET_USER_DID.");
+    ).rejects.toThrow("Captured unexpected tool call(s): AUTH_AGENT_CONTEXT.");
   });
 
   it("supports follow-up prompt and enforces strictness across both attempts", async () => {
     const invoke = vi
       .fn()
-      .mockImplementationOnce(async () => createResponse("first"))
-      .mockImplementationOnce(async () => createResponse("second"));
+      .mockImplementationOnce(() => Promise.resolve(createResponse("first")))
+      .mockImplementationOnce(() => Promise.resolve(createResponse("second")));
     const parseNewToolMessages = vi.fn((response: MockResponse) => {
       if (response.id === "first") {
         return [];
       }
       return [
         {
-          toolName: "VALIDATE_T3N_AUTH_SESSION",
+          toolName: "PRIVATE_DATA_PROCESSING",
           parsedData: { raw: { success: true } },
         },
       ];
     });
 
     const result = await invokeAgentTool({
-      agent: { invoke } as any,
-      responseParser: { parseNewToolMessages } as any,
+      agent: createTestAgent(invoke),
+      responseParser: createTestResponseParser(parseNewToolMessages),
       threadId: "thread-follow-up",
-      userPrompt: "validate session",
-      followUpPrompt: "call validate tool",
-      expectedToolNames: ["VALIDATE_T3N_AUTH_SESSION"],
-      expectedToolLabel: "VALIDATE_T3N_AUTH_SESSION",
+      userPrompt: "run private data processing",
+      followUpPrompt: "call private data tool",
+      expectedToolNames: ["PRIVATE_DATA_PROCESSING"],
+      expectedToolLabel: "PRIVATE_DATA_PROCESSING",
       requireExactlyOneMatchingToolCall: true,
       disallowUnexpectedToolCalls: true,
     });
 
-    expect(result.toolCall.toolName).toBe("VALIDATE_T3N_AUTH_SESSION");
+    expect(result.toolCall.toolName).toBe("PRIVATE_DATA_PROCESSING");
     expect(invoke).toHaveBeenCalledTimes(2);
   });
 });

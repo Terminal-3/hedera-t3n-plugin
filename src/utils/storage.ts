@@ -12,19 +12,20 @@
  */
 
 import { existsSync } from "fs";
-import { chmod, mkdir, writeFile } from "fs/promises";
+import { mkdir, writeFile } from "fs/promises";
 import { basename, dirname, join, resolve } from "path";
 
 import { deriveDidFragment } from "./crypto.js";
 import { type Environment } from "./environment.js";
+import { ensureOwnerOnlyFilePermissions } from "./file-permissions.js";
 
 export interface StoredCredentials {
   version: number;
-  did_key: string;
   did_t3n: string;
   hedera_wallet: string;
   network_tier: Environment;
   private_key: string;
+  public_key: string;
   created_at: string;
   agent_card_path?: string;
   agent_card_cid?: string;
@@ -56,14 +57,11 @@ export interface StoreOptions {
 }
 
 const DEFAULT_OUTPUT = "output/identities";
-const OWNER_ONLY_FILE_MODE = 0o600;
 
 /**
  * Sanitizes a DID fragment for use as a filesystem-safe filename.
  *
- * This function is more permissive than DID_KEY_REGEX because it must handle both:
- * - did:key fragments (base58btc encoded: zQ3sh...)
- * - did:t3n:a: fragments (hex with optional hyphens: abc123-def-456)
+ * Handles did:t3n fragments (40-char hex Ethereum address fragments).
  *
  * Preserves alphanumeric characters, underscores, and hyphens. Removes all other
  * characters that could cause filesystem issues (e.g., path separators, special chars).
@@ -122,7 +120,7 @@ export async function storeCredentials(
     // Generate filename from DID fragment in specified or default directory
     const outputDir = options.outputDir || DEFAULT_OUTPUT;
     const resolvedOutput = resolve(outputDir);
-    const didFragment = deriveDidFragment(credentials.did_t3n || credentials.did_key);
+    const didFragment = deriveDidFragment(credentials.did_t3n);
     const safeFragment = sanitizeFragmentForFilename(didFragment);
     const filename = `${safeFragment}.json`;
     filepath = join(resolvedOutput, filename);
@@ -142,7 +140,7 @@ export async function storeCredentials(
 
   // Attempt to set restrictive permissions (600 = owner read/write only)
   // This may fail on Windows or certain filesystems, so we catch and warn rather than fail
-  await applyOwnerOnlyPermissions(filepath);
+  await ensureOwnerOnlyFilePermissions(filepath);
 
   return filepath;
 }
@@ -152,21 +150,7 @@ export async function writeIdentityConfigFile(
   data: Record<string, unknown>
 ): Promise<void> {
   await writeFile(filepath, JSON.stringify(data, null, 2), "utf8");
-  await applyOwnerOnlyPermissions(filepath);
-}
-
-async function applyOwnerOnlyPermissions(filepath: string): Promise<void> {
-  try {
-    await chmod(filepath, OWNER_ONLY_FILE_MODE);
-  } catch {
-    // Permission setting failed - log warning but don't fail the operation
-    // This allows the plugin to work on systems where chmod behavior differs
-    if (process.env.NODE_ENV !== "test") {
-      console.warn(
-        `Warning: Could not set restrictive permissions on ${filepath}. File may be accessible to other users.`
-      );
-    }
-  }
+  await ensureOwnerOnlyFilePermissions(filepath);
 }
 
 /**
