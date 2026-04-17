@@ -6,18 +6,20 @@
  * Outputs: CID, gateway URL, upload filename, and updated identity config metadata
  */
 
-import { chmod, readFile, writeFile } from "fs/promises";
-import { resolve } from "path";
-
 import { PinataSDK } from "pinata";
 
-import { getAgentIdentityConfigPath } from "./utils/env.js";
 import {
   getAgentCardUploadFilename,
   loadOrCreateAgentCard,
-  parseJsonObject,
   type AgentIdentityRecord,
 } from "./utils/agentCard.js";
+import {
+  loadAgentIdentityConfigObject,
+  resolveRequiredAgentIdentityConfigPath,
+} from "./utils/agent-identity-config.js";
+import { ensureOwnerOnlyFilePermissions } from "./utils/file-permissions.js";
+import { writeIdentityConfigFile } from "./utils/storage.js";
+import { messageFromError } from "./utils/tool-result.js";
 
 export interface SubmitAgentCardPinataOptions {
   identityConfigPath?: string;
@@ -34,13 +36,6 @@ export interface SubmitAgentCardPinataResult {
   agentCardPath: string;
   identityConfigPath: string;
   created: boolean;
-}
-
-function getErrorMessage(error: unknown): string {
-  if (error instanceof Error && error.message) {
-    return error.message;
-  }
-  return String(error);
 }
 
 async function uploadWithJwt(
@@ -95,28 +90,21 @@ async function uploadWithApiKey(
   return cid;
 }
 
-function resolveIdentityConfigPath(
-  pathArg: string | undefined,
-  env: NodeJS.ProcessEnv
-): string {
-  const identityConfigPath = pathArg?.trim() || getAgentIdentityConfigPath(env);
-  if (!identityConfigPath) {
-    throw new Error(
-      "Agent identity configuration path is required. Pass --path <identity.json> " +
-        "or set AGENT_IDENTITY_CONFIG_PATH."
-    );
-  }
-  return resolve(identityConfigPath);
-}
-
 export async function submitAgentCardToPinata(
   options: SubmitAgentCardPinataOptions = {}
 ): Promise<SubmitAgentCardPinataResult> {
   const env = options.env ?? process.env;
-  const identityConfigPath = resolveIdentityConfigPath(options.identityConfigPath, env);
-
-  const raw = await readFile(identityConfigPath, "utf8");
-  const identityJson = parseJsonObject(raw, "Identity file") as AgentIdentityRecord;
+  const identityConfigPath = resolveRequiredAgentIdentityConfigPath({
+    pathOverride: options.identityConfigPath,
+    env,
+    missingPathMessage:
+      "Agent identity configuration path is required. Pass --path <identity.json> or set AGENT_IDENTITY_CONFIG_PATH.",
+  });
+  const identityJson = (await loadAgentIdentityConfigObject({
+    resolvedPath: identityConfigPath,
+    emptyFileMessage: `Identity file at ${identityConfigPath} is empty. Run \`pnpm create-identity\` first.`,
+    invalidObjectMessage: "Identity file must contain a JSON object",
+  })) as AgentIdentityRecord;
   const { agentCardPath, agentCard, created } = await loadOrCreateAgentCard({
     identityPath: identityConfigPath,
     identity: identityJson,
@@ -155,7 +143,7 @@ export async function submitAgentCardToPinata(
     try {
       cid = await uploadWithJwt(agentCard, uploadFilename, jwt as string);
     } catch (error) {
-      jwtError = getErrorMessage(error);
+      jwtError = messageFromError(error);
       if (hasApiKeyAuth) {
         console.warn(
           `Warning: JWT upload failed. Falling back to API key/secret. Reason: ${jwtError}`
@@ -175,7 +163,7 @@ export async function submitAgentCardToPinata(
         apiSecret as string
       );
     } catch (error) {
-      apiKeyError = getErrorMessage(error);
+      apiKeyError = messageFromError(error);
       if (jwtError) {
         throw new Error(
           `Pinata upload failed. JWT attempt: ${jwtError}. API key attempt: ${apiKeyError}`
@@ -201,17 +189,8 @@ export async function submitAgentCardToPinata(
     agent_card_gateway_url: gatewayUrl,
   };
 
-  await writeFile(identityConfigPath, JSON.stringify(updatedIdentity, null, 2), "utf8");
-
-  try {
-    await chmod(identityConfigPath, 0o600);
-  } catch {
-    if (env.NODE_ENV !== "test") {
-      console.warn(
-        `Warning: Could not set restrictive permissions on ${identityConfigPath}. File may be accessible to other users.`
-      );
-    }
-  }
+  await writeIdentityConfigFile(identityConfigPath, updatedIdentity);
+  await ensureOwnerOnlyFilePermissions(agentCardPath);
 
   return {
     cid,

@@ -9,8 +9,7 @@ function buildResult(
   overrides: Partial<CreateIdentityResult> = {}
 ): CreateIdentityResult {
   return {
-    did_key: "did:key:zQ3shExample",
-    did_t3n: "did:t3:a:1234",
+    did_t3n: "did:t3n:1234567890abcdef1234567890abcdef12345678",
     hedera_wallet: "0x1234567890abcdef1234567890abcdef12345678",
     credentials_path: "/tmp/agent_identity.json",
     agent_card_path: "/tmp/agent_card.json",
@@ -56,5 +55,17 @@ describe("formatCreateIdentityMessage", () => {
 
     expect(message).toContain("T3N endpoint mode: local/mock (no network call)");
     expect(message).toContain("T3N API URL: (mock/no network call)");
+  });
+
+  it("labels non-local DID as authenticated when registration is still explicit", () => {
+    const message = formatCreateIdentityMessage(
+      buildResult({
+        registration_tx_hash: undefined,
+      })
+    );
+
+    expect(message).toContain(
+      "T3N Identity (did:t3n:): did:t3n:1234567890abcdef1234567890abcdef12345678 (authenticated from T3N staging; agent registration remains explicit)"
+    );
   });
 });

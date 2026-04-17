@@ -1,7 +1,7 @@
 /**
- * Purpose: Health check utility for Ollama LLM service
- * Scope:   Checks if Ollama is reachable and specified model is available
- * Inputs:  Ollama base URL, model name, optional timeout
+ * Purpose: Health check utility for supported E2E LLM services
+ * Scope:   Checks if Ollama is reachable and specified model is available, or Groq config exists
+ * Inputs:  Provider config and optional timeout
  * Outputs: Health check result with availability status and available models list
  */
 
@@ -16,6 +16,42 @@ export type LlmHealthCheckResult = {
   reason?: string;
   availableModels?: string[];
 };
+
+export async function checkLlmHealth({
+  provider,
+  baseUrl,
+  model,
+  apiKey,
+  timeoutMs = DEFAULT_HEALTH_CHECK_TIMEOUT_MS,
+}: {
+  provider: "ollama" | "groq" | "openrouter";
+  baseUrl?: string;
+  model: string;
+  apiKey?: string;
+  timeoutMs?: number;
+}): Promise<LlmHealthCheckResult> {
+  if (provider === "groq") {
+    return apiKey
+      ? { ok: true, availableModels: [model] }
+      : { ok: false, reason: "GROQ_API_KEY is missing." };
+  }
+
+  if (provider === "openrouter") {
+    if (!apiKey) {
+      return { ok: false, reason: "OPENROUTER_API_KEY is missing." };
+    }
+    if (!baseUrl) {
+      return { ok: false, reason: "OPENROUTER_BASE_URL is missing." };
+    }
+    return { ok: true, availableModels: [model] };
+  }
+
+  if (!baseUrl) {
+    return { ok: false, reason: "OLLAMA_BASE_URL is missing." };
+  }
+
+  return checkOllamaHealth(baseUrl, model, timeoutMs);
+}
 
 export async function checkOllamaHealth(
   baseUrl: string,

@@ -7,15 +7,18 @@
  */
 
 import { readFile } from "fs/promises";
-import { resolve } from "path";
 
 import type { NetworkTier } from "./createIdentity.js";
 import {
-  readAgentIdentityConfig,
-  validateAgentIdentityConfig,
+  loadIdentityOrThrow,
 } from "./utils/agent-identity-config.js";
+import { assertJsonObjectShape, type AgentCardRecord } from "./utils/agentCard.js";
+import {
+  AGENT_CARD_FETCH_ATTEMPT_TIMEOUT_MS,
+  AGENT_CARD_FETCH_RETRY_INTERVAL_MS,
+  AGENT_CARD_FETCH_TIMEOUT_MS,
+} from "./utils/constants.js";
 import { writeIdentityConfigFile } from "./utils/storage.js";
-import { getAgentIdentityConfigPath } from "./utils/env.js";
 import {
   assertHederaRegistrationReady,
   registerHederaAgentIdentity,
@@ -24,34 +27,19 @@ import {
 } from "./utils/hedera.js";
 import {
   getT3nEnvironmentLabel,
+  isTransientNetworkOrGatewayError,
   registerDidT3n,
   resolveT3nRuntimeApiUrl,
 } from "./utils/t3n.js";
+import { getT3nEndpointMode } from "./utils/t3n-endpoint.js";
 import { messageFromError } from "./utils/tool-result.js";
-import { validateStoredCredentials } from "./utils/validation.js";
-
-const AGENT_CARD_FETCH_TIMEOUT_MS = 20_000;
-const AGENT_CARD_FETCH_ATTEMPT_TIMEOUT_MS = 5_000;
-const AGENT_CARD_FETCH_RETRY_INTERVAL_MS = 2_000;
+import { isNonEmptyString } from "./utils/validation.js";
 
 type ValidatePublicAgentCardUrlOptions = {
   timeoutMs?: number;
   attemptTimeoutMs?: number;
   retryIntervalMs?: number;
 };
-
-interface AgentCardEndpointRecord {
-  name: string;
-  endpoint: string;
-  version: string;
-}
-
-interface AgentCardRecord {
-  type: string;
-  name: string;
-  description: string;
-  endpoints: AgentCardEndpointRecord[];
-}
 
 export interface RegisterAgentErc8004Options {
   agentUri?: string;
@@ -80,46 +68,6 @@ export interface RegisterAgentErc8004Result {
     runtimeApiUrl?: string;
   };
   hedera: RegisterHederaAgentResult;
-}
-
-function isLocalhostUrl(url: string): boolean {
-  try {
-    const hostname = new URL(url).hostname.toLowerCase();
-    return hostname === "localhost" || hostname === "127.0.0.1" || hostname === "::1";
-  } catch {
-    const normalized = url.trim().toLowerCase();
-    return (
-      normalized.includes("localhost") ||
-      normalized.includes("127.0.0.1") ||
-      normalized.includes("[::1]")
-    );
-  }
-}
-
-function getT3nEndpointMode(
-  networkTier: NetworkTier,
-  t3nApiBaseUrl: string | undefined
-): string {
-  if (!t3nApiBaseUrl) {
-    return networkTier === "local"
-      ? "local/mock (no network call)"
-      : "endpoint unavailable";
-  }
-
-  if (isLocalhostUrl(t3nApiBaseUrl)) {
-    return networkTier === "local"
-      ? "local CCF"
-      : "local CCF override (Hedera remains non-local)";
-  }
-
-  if (networkTier === "testnet") {
-    return "public staging";
-  }
-  if (networkTier === "mainnet") {
-    return "public production";
-  }
-
-  return "custom remote endpoint";
 }
 
 function readStoredAgentUri(data: unknown): string | undefined {
@@ -178,33 +126,8 @@ function normalizeAgentUri(agentUri: string): string {
   return normalized;
 }
 
-function resolveIdentityConfigPath(
-  pathOverride: string | undefined,
-  env: NodeJS.ProcessEnv
-): string {
-  const configuredPath =
-    pathOverride && pathOverride.trim() !== ""
-      ? pathOverride.trim()
-      : getAgentIdentityConfigPath(env);
-
-  if (!configuredPath) {
-    throw new Error(
-      "Agent identity configuration path not set. Pass --path <identity.json> " +
-        "or set AGENT_IDENTITY_CONFIG_PATH."
-    );
-  }
-
-  return resolve(configuredPath);
-}
-
-function isNonEmptyString(value: unknown): value is string {
-  return typeof value === "string" && value.trim() !== "";
-}
-
 function assertAgentCardRecord(data: unknown, agentUri: string): asserts data is AgentCardRecord {
-  if (!data || typeof data !== "object" || Array.isArray(data)) {
-    throw new Error(`Agent card at '${agentUri}' must be a JSON object.`);
-  }
+  assertJsonObjectShape(data, `Agent card at '${agentUri}' must be a JSON object.`);
 
   const record = data as Record<string, unknown>;
   if (!isNonEmptyString(record.type)) {
@@ -312,7 +235,7 @@ export async function validatePublicAgentCardUrl(
       return;
     } catch (error) {
       lastError = messageFromError(error);
-      if (!isTransientGatewayValidationFailure(error)) {
+      if (!isTransientNetworkOrGatewayError(error)) {
         break;
       }
       if (Date.now() + retryIntervalMs > deadline) {
@@ -329,25 +252,6 @@ export async function validatePublicAgentCardUrl(
   );
 }
 
-function isGatewayValidationThrottle(error: unknown): boolean {
-  return isTransientGatewayValidationFailure(error);
-}
-
-function isTransientGatewayValidationFailure(error: unknown): boolean {
-  const message = messageFromError(error).toLowerCase();
-  return (
-    message.includes("http 429") ||
-    message.includes("http 502") ||
-    message.includes("http 503") ||
-    message.includes("http 504") ||
-    message.includes("aborted") ||
-    message.includes("timed out") ||
-    message.includes("timeout") ||
-    message.includes("fetch failed") ||
-    message.includes("network error")
-  );
-}
-
 async function validateLocalAgentCardFile(
   agentCardPath: string,
   agentUri: string
@@ -361,25 +265,13 @@ export async function registerAgentErc8004(
   options: RegisterAgentErc8004Options
 ): Promise<RegisterAgentErc8004Result> {
   const env = options.env ?? process.env;
-  const identityConfigPath = resolveIdentityConfigPath(options.identityConfigPath, env);
+  const { path: identityConfigPath, data, credentials } = await loadIdentityOrThrow({
+    pathOverride: options.identityConfigPath,
+    env,
+    missingPathMessage:
+      "Agent identity configuration path not set. Pass --path <identity.json> or set AGENT_IDENTITY_CONFIG_PATH.",
+  });
 
-  const readResult = await readAgentIdentityConfig(identityConfigPath);
-  if (!readResult.ok) {
-    throw new Error(readResult.humanMessage);
-  }
-
-  const validateResult = validateAgentIdentityConfig(readResult.data, identityConfigPath);
-  if (!validateResult.ok) {
-    throw new Error(validateResult.humanMessage);
-  }
-
-  if (readResult.data === undefined) {
-    throw new Error(
-      `Identity configuration at ${identityConfigPath} is empty. Run \`pnpm create-identity\` first.`
-    );
-  }
-
-  const credentials = validateStoredCredentials(readResult.data);
   const network = (options.networkTier ?? credentials.network_tier) as NetworkTier;
   if (network === "local") {
     throw new Error(
@@ -387,15 +279,15 @@ export async function registerAgentErc8004(
     );
   }
 
-  const resolvedAgentUri = options.agentUri?.trim() || readStoredAgentUri(readResult.data);
+  const resolvedAgentUri = options.agentUri?.trim() || readStoredAgentUri(data);
   if (!resolvedAgentUri) {
     throw new Error(
       "Agent URI is required. Pass --agent-uri <uri> or run `hedera-t3n-plugin ipfs-submit-agent-card-pinata` first."
     );
   }
   const agentUri = normalizeAgentUri(resolvedAgentUri);
-  const storedAgentUri = readStoredAgentUri(readResult.data);
-  const storedAgentCardPath = readStoredAgentCardPath(readResult.data);
+  const storedAgentUri = readStoredAgentUri(data);
+  const storedAgentCardPath = readStoredAgentCardPath(data);
 
   try {
     await validatePublicAgentCardUrl(agentUri);
@@ -403,7 +295,7 @@ export async function registerAgentErc8004(
     const canUseStoredLocalFallback =
       storedAgentUri === agentUri && typeof storedAgentCardPath === "string";
 
-    if (!canUseStoredLocalFallback || !isGatewayValidationThrottle(error)) {
+    if (!canUseStoredLocalFallback || !isTransientNetworkOrGatewayError(error)) {
       throw error;
     }
 
@@ -479,7 +371,7 @@ export async function registerAgentErc8004(
   }
 
   const updatedIdentity = {
-    ...(readResult.data as Record<string, unknown>),
+    ...data,
     t3n_registration: {
       tx_hash: t3nRegistration.txHash,
       agent_uri: agentUri,

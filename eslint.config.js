@@ -47,12 +47,4 @@ export default tseslint.config(
       },
     },
   },
-  {
-    files: ['tests/unit/**/*.ts', 'tests/integration/**/*.ts'],
-    rules: {
-      '@typescript-eslint/no-explicit-any': 'off',
-      '@typescript-eslint/no-unsafe-assignment': 'off',
-      '@typescript-eslint/require-await': 'off',
-    },
-  },
 );

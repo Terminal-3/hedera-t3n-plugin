@@ -213,8 +213,8 @@ packages:
     resolution: {integrity: sha512-ju7Y4WeF0B9uMkSPHJgmT6ouEfSwbe9M1uR/YOnYZjBpxJjH9qzxIkJg/kf8NycVDyFJ2/lscmJ1E1uPiDQVRQ==}
     hasBin: true
 
-  '@bytecodealliance/jco@1.17.0':
-    resolution: {integrity: sha512-+8cLL6p++K+KKJiG+xqRDyKcjoWvAB1cwH+diIvuUf8O0AEN+QfzW7GdZJ0zzvfpCfGYX+uO7ylmPFvn+pWxCA==}
+  '@bytecodealliance/jco@1.17.6':
+    resolution: {integrity: sha512-2D/v9m+6cwVd/MYmv6rBgaiUv6vBJaSKWwbPh4ltAfxcbh4KYJioSsAiEyiwKSD2HlK0LZ45N0Kzfc9WOyWnVQ==}
     hasBin: true
 
   '@bytecodealliance/preview2-shim@0.17.8':
@@ -953,8 +953,8 @@ packages:
       '@hashgraph/sdk': ^2.74.0
       hedera-agent-kit: ^3.4.0
 
-  '@terminal3/t3n-sdk@0.2.1':
-    resolution: {integrity: sha512-Zv6Al1LptBXBqnjlDdNXGwlk8Hah343RmX+X0XMaq/RRQFVfrkCeGHgZarm9bBZcxfXn5xxrEKjUxvA8BP1urQ==}
+  '@terminal3/t3n-sdk@0.7.0':
+    resolution: {integrity: sha512-jneUM5cR9CT8UIot7f98BchmdyljV6F5DlCIu1aiFsTyehZoddlNoUYWvTZHlFp9JnodyxJC06/ZJfxZrqDM3Q==}
     engines: {node: '>=16.0.0'}
     peerDependencies:
       typescript: '>=4.5.0'
@@ -3073,12 +3073,12 @@ snapshots:
 
   '@bytecodealliance/componentize-js@0.19.3':
     dependencies:
-      '@bytecodealliance/jco': 1.17.0
+      '@bytecodealliance/jco': 1.17.6
       '@bytecodealliance/wizer': 10.0.0
       es-module-lexer: 1.7.0
       oxc-parser: 0.76.0
 
-  '@bytecodealliance/jco@1.17.0':
+  '@bytecodealliance/jco@1.17.6':
     dependencies:
       '@bytecodealliance/componentize-js': 0.19.3
       '@bytecodealliance/preview2-shim': 0.17.8
@@ -3852,7 +3852,7 @@ snapshots:
     dependencies:
       '@hashgraph/sdk': 2.80.0(bn.js@5.2.3)(react-native@0.84.1(@babel/core@7.29.0)(react@19.2.4))
       '@noble/secp256k1': 2.3.0
-      '@terminal3/t3n-sdk': 0.2.1(typescript@5.9.3)
+      '@terminal3/t3n-sdk': 0.7.0(typescript@5.9.3)
       bs58: 5.0.0
       dotenv: 16.6.1
       ethers: 6.16.0
@@ -3866,9 +3866,9 @@ snapshots:
       - typescript
       - utf-8-validate
 
-  '@terminal3/t3n-sdk@0.2.1(typescript@5.9.3)':
+  '@terminal3/t3n-sdk@0.7.0(typescript@5.9.3)':
     dependencies:
-      '@bytecodealliance/jco': 1.17.0
+      '@bytecodealliance/jco': 1.17.6
       '@bytecodealliance/preview2-shim': 0.17.8
       ethers: 6.16.0
       typescript: 5.9.3

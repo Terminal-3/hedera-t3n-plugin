@@ -1,6 +1,6 @@
 /**
  * Purpose: Core identity creation workflow for Hedera T3N plugin
- * Scope:   Orchestrates complete identity creation: keypair generation, DID derivation,
+ * Scope:   Orchestrates complete identity creation: keypair generation,
  *          deterministic T3N DID derivation, and credential storage
  * Inputs:  CreateIdentityOptions (network tier, output paths)
  * Outputs: CreateIdentityResult with all derived identifiers and storage path
@@ -9,20 +9,23 @@
  * Hedera T3N ecosystem. It handles the full lifecycle from cryptographic key generation
  * to network registration and secure credential storage.
  *
- * The workflow ensures that all identifiers (did:key, did:t3n:a:, Hedera wallet) are
+ * The workflow ensures that all identifiers (did:t3n, Hedera wallet) are
  * cryptographically linked before storage. Public registration remains an explicit
  * follow-up step handled by the registration workflow.
  */
 
-import { generateSecp256k1Keypair, deriveDidKey } from "./utils/crypto.js";
+import { generateSecp256k1Keypair } from "./utils/crypto.js";
 import { deriveHederaAddress } from "./utils/hedera.js";
 import { loadOrCreateAgentCard } from "./utils/agentCard.js";
 import {
   deriveDeterministicT3nDid,
   getT3nEnvironmentLabel,
+  registerDidT3n,
   resolveT3nBaseUrl,
   resolveT3nRuntimeApiUrl,
 } from "./utils/t3n.js";
+import { getT3nEndpointMode } from "./utils/t3n-endpoint.js";
+import { messageFromError } from "./utils/error-utils.js";
 import { storeCredentials, type StoreOptions } from "./utils/storage.js";
 
 import type { Environment } from "./utils/environment.js";
@@ -38,7 +41,6 @@ export interface CreateIdentityOptions {
 }
 
 export interface CreateIdentityResult {
-  did_key: string;
   did_t3n: string;
   hedera_wallet: string;
   credentials_path: string;
@@ -48,46 +50,6 @@ export interface CreateIdentityResult {
   t3n_runtime_api_url?: string;
   agent_uri?: string;
   registration_tx_hash?: string;
-}
-
-function isLocalhostUrl(url: string): boolean {
-  try {
-    const hostname = new URL(url).hostname.toLowerCase();
-    return hostname === "localhost" || hostname === "127.0.0.1" || hostname === "::1";
-  } catch {
-    const normalized = url.trim().toLowerCase();
-    return (
-      normalized.includes("localhost") ||
-      normalized.includes("127.0.0.1") ||
-      normalized.includes("[::1]")
-    );
-  }
-}
-
-function getT3nEndpointMode(
-  networkTier: NetworkTier,
-  t3nApiBaseUrl: string | undefined
-): string {
-  if (!t3nApiBaseUrl) {
-    return networkTier === "local"
-      ? "local/mock (no network call)"
-      : "endpoint unavailable";
-  }
-
-  if (isLocalhostUrl(t3nApiBaseUrl)) {
-    return networkTier === "local"
-      ? "local CCF"
-      : "local CCF override (Hedera remains non-local)";
-  }
-
-  if (networkTier === "testnet") {
-    return "public staging";
-  }
-  if (networkTier === "mainnet") {
-    return "public production";
-  }
-
-  return "custom remote endpoint";
 }
 
 /**
@@ -107,14 +69,46 @@ function buildStoreOptions(options: CreateIdentityOptions): StoreOptions {
 }
 
 /**
- * Creates a new agent identity with deterministic T3N DID derivation.
+ * Resolves the canonical did:t3n to persist during identity creation.
+ *
+ * Local mode stays offline-safe and derives DID deterministically from the wallet.
+ * Non-local tiers authenticate against T3N using the generated identity keypair and
+ * use the DID returned by T3N as the source of truth.
+ */
+async function resolveDidT3nForCreateIdentity(
+  privateKey: string,
+  hederaWallet: string,
+  networkTier: NetworkTier
+): Promise<string> {
+  if (networkTier === "local") {
+    return deriveDeterministicT3nDid(hederaWallet);
+  }
+
+  try {
+    const { did } = await registerDidT3n(privateKey, networkTier, {
+      registerAgentUri: false,
+      verifyRegistration: false,
+      env: process.env,
+    });
+    return did;
+  } catch (error) {
+    const t3nEnvLabel = getT3nEnvironmentLabel(networkTier);
+    throw new Error(
+      `Failed to create identity: could not authenticate did:t3n from T3N ${t3nEnvLabel} with the generated identity key. ${messageFromError(error)}`
+    );
+  }
+}
+
+/**
+ * Creates a new agent identity with environment-aware T3N DID resolution.
  *
  * This function orchestrates the complete identity creation workflow:
  * 1. Generates a cryptographically secure secp256k1 keypair
- * 2. Derives did:key identifier from the public key (W3C DID standard)
- * 3. Derives Hedera-compatible wallet address from the private key
- * 4. Derives the did:t3n:a: / did:t3:a: identifier for the selected environment
- * 5. Stores all credentials securely to disk with restrictive permissions
+ * 2. Derives Hedera-compatible wallet address from the private key
+ * 3. Resolves the canonical did:t3n identifier for the selected environment:
+ *    - local: deterministic local derivation
+ *    - testnet/mainnet: authenticated DID returned by T3N
+ * 4. Stores all credentials securely to disk with restrictive permissions
  *
  * All identifiers are cryptographically linked: the same private key generates
  * all derived values, ensuring consistency across the identity system.
@@ -132,39 +126,38 @@ export async function createIdentity(
   const networkTier = options.networkTier ?? "testnet";
 
   const keypair = generateSecp256k1Keypair();
-  const didKey = deriveDidKey(keypair.publicKey);
   const hederaWallet = deriveHederaAddress(keypair.privateKey);
 
   const t3nApiBaseUrl = await resolveT3nBaseUrl(networkTier);
   const runtimeApiUrl = await resolveT3nRuntimeApiUrl(networkTier);
-  const didT3n = deriveDeterministicT3nDid(hederaWallet, {
-    networkTier,
-    baseUrl: t3nApiBaseUrl,
-  });
+  const didT3n = await resolveDidT3nForCreateIdentity(
+    keypair.privateKey,
+    hederaWallet,
+    networkTier
+  );
 
   const storeOptions = buildStoreOptions(options);
 
   const credentialsPath = await storeCredentials(
     {
-      did_key: didKey,
       did_t3n: didT3n,
       hedera_wallet: hederaWallet,
       network_tier: networkTier,
       private_key: keypair.privateKey,
+      public_key: keypair.publicKey,
     },
     storeOptions
   );
   const { agentCardPath } = await loadOrCreateAgentCard({
     identityPath: credentialsPath,
     identity: {
-      did_key: didKey,
       did_t3n: didT3n,
       hedera_wallet: hederaWallet,
+      public_key: keypair.publicKey,
     },
   });
 
   return {
-    did_key: didKey,
     did_t3n: didT3n,
     hedera_wallet: hederaWallet,
     credentials_path: credentialsPath,
@@ -188,7 +181,6 @@ export async function createIdentity(
 export function formatCreateIdentityMessage(result: CreateIdentityResult): string {
   const {
     networkTier,
-    did_key,
     did_t3n,
     hedera_wallet,
     credentials_path,
@@ -209,13 +201,12 @@ export function formatCreateIdentityMessage(result: CreateIdentityResult): strin
     `T3N endpoint mode: ${t3nEndpointMode}`,
     `T3N API URL: ${t3n_api_base_url ?? "(mock/no network call)"}`,
     `T3N runtime API URL: ${t3n_runtime_api_url ?? "(not configured)"}`,
-    `did:key: ${did_key}`,
-    `T3N Identity (did:t3n:a:): ${did_t3n}${
+    `T3N Identity (did:t3n:): ${did_t3n}${
       isLocal
         ? ` (${t3nEnvLabel})`
         : registration_tx_hash
           ? ` (registered on T3N ${t3nEnvLabel})`
-          : ` (derived for T3N ${t3nEnvLabel}; agent registration remains explicit)`
+          : ` (authenticated from T3N ${t3nEnvLabel}; agent registration remains explicit)`
     }`,
     `Hedera wallet: ${hedera_wallet}`,
     agent_uri ? `Agent URI: ${agent_uri}` : undefined,

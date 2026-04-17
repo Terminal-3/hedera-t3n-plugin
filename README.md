@@ -1,140 +1,126 @@
-# Hedera T3N Plugin
+# Hedera Agent Kit - Terminal 3 Network (T3N) Plugin
 
-## Plugin Name
+A plugin for [Hedera Agent Kit JS](https://github.com/hashgraph/hedera-agent-kit-js) that provides access to [Terminal 3 Network (T3N)](https://docs.terminal3.io/t3n/) to enable identity verification, authentication, and last mile-delivery or selective disclosure of private and sensitive information for AI-driven applications, ensuring compliant and auditable interactions.
 
-`@terminal3/hedera-t3n-plugin` was built by Terminal 3 for T3N agent identity workflows. It gives Hedera Agent Kit builders a practical bridge into T3N so agents can create local identities, open authenticated T3N sessions, track user DIDs, inspect profile-field availability, and inspect T3N plus Hedera registration state.
+## Overview
 
-This open-source packaging pass keeps the existing user-DID, profile, session, and registration-inspection capabilities intact. The cleanup removes stale legacy compliance wording and private-package assumptions, not active runtime features.
+This plugin enables `AI agents` to interact with [Terminal 3 Network (T3N)](https://docs.terminal3.io/t3n/), a decentralized network for user data and AI agent governance. The plugin provides the following tools:
 
-## T3N Context
+- PRIVATE_DATA_PROCESSING
+- KYC
 
-T3N is Terminal 3's runtime, identity, and trust layer for building verified application, agent, and user flows. In this plugin's scope, that shows up as T3N sessions, `did:t3n` identities, profile lookups, and agent registration flows.
+## Installation
 
-The purpose of this plugin is not to expose all of T3N. It packages the Hedera Agent Kit path into the parts of T3N that matter for local agent identity, authenticated sessions, profile-aware checks, and registration readback, so app builders do not need to wire that lifecycle themselves. Use it when your Hedera-based agent needs to:
+`npm install @terminal3/hedera-t3n-plugin hedera-agent-kit @hashgraph/sdk`
 
-- create and validate a local T3N agent identity
-- authenticate into T3N and verify the session is still usable
-- work with stored user DIDs before profile checks
-- inspect whether an agent is registered across both T3N and Hedera
+## Prerequisite
 
-### Installation
+Before your AI agent can access [T3N](https://docs.terminal3.io/t3n/), you must create its identity and register it in both T3N and the Hedera ERC-8004 identity registry via CLI.
 
-```bash
-npm install @terminal3/hedera-t3n-plugin hedera-agent-kit @hashgraph/sdk
-```
+### AI agent identity creation
 
-### Usage
+Create an AI agent identity (`did:t3n`) via a Hedera wallet.
 
-```ts
-import { Client, PrivateKey } from "@hashgraph/sdk";
-import { AgentMode, HederaLangchainToolkit } from "hedera-agent-kit";
-import { hederaT3nPlugin } from "@terminal3/hedera-t3n-plugin";
+1. Run the identity creation CLI:
 
-const client = Client.forTestnet().setOperator(
-  process.env.HEDERA_ACCOUNT_ID!,
-  PrivateKey.fromStringECDSA(process.env.HEDERA_PRIVATE_KEY!)
-);
+   ```bash
+   npx hedera-t3n-plugin create-identity --env mainnet
+   ```
 
-const toolkit = new HederaLangchainToolkit({
-  client,
-  configuration: {
-    context: {
-      mode: AgentMode.AUTONOMOUS,
-    },
-    plugins: [hederaT3nPlugin],
-    tools: [],
-  },
-});
+2. The CLI will:
+   - generate a `secp256k1` keypair
+   - derive the Hedera EVM-compatible wallet address
+   - derive the canonical `did:t3n:<full-hex-eth-address-without-0x>` identifier
+   - write the identity credentials to a local JSON file
+   - create a local `agent_card.json` scaffold
 
-const tools = toolkit.getTools();
-```
+3. Capture the generated identity details, including:
+   - `did:t3n`
+   - Hedera wallet / EVM-compatible address
+   - identity config path
+   - local `agent_card.json` path
 
-Set `AGENT_IDENTITY_CONFIG_PATH` in the host runtime before invoking tools that read the local identity file.
+4. Host the generated `agent_card.json` at a public HTTP(S) URL before registration. This repository includes a script that helps you upload it to IPFS via Pinata:
 
-### Functionality
+   ```bash
+   npx hedera-t3n-plugin ipfs-submit-agent-card-pinata
+   ```
 
-**Hedera T3N Plugin**
-_Identity readiness, session auth, user-DID tracking, profile inspection, and registration-readback tools for a locally managed T3N agent identity._
+   Set Pinata credentials in `.env.secret.pinata` (see `.env.secret.pinata.example`) or pass `--jwt`, `--api-key`, and `--api-secret` to the command. Ensure `AGENT_IDENTITY_CONFIG_PATH` points at your identity file (or pass `--path`). The CLI prints a gateway URL you can use as the public `agentURI` when registering.
 
-| Tool Name | Description | Usage |
-| --- | --- | --- |
-| `ADD_USER_DID` | Stores one user DID plus a local remark for later profile checks. | Parameters: `userDid`, `remark`. Replaces any previously stored DID in the current runtime. |
-| `CHECK_AGENT_REGISTRATION_STATUS` | Summarizes whether the current agent is registered on T3N and Hedera ERC-8004. | No parameters. Requires `AGENT_IDENTITY_CONFIG_PATH` and a testnet/mainnet identity. |
-| `CHECK_MY_PROFILE_FIELDS` | Checks whether requested fields exist for the currently stored user DID without returning values. | Parameters: `fields`. Requires an active T3N session plus a stored user DID. |
-| `CHECK_PROFILE_FIELD_EXISTENCE` | Checks whether requested fields exist for another T3N profile without returning values. | Parameters: `fields`, optional `targetDid`. Requires an active T3N session. |
-| `CREATE_T3N_AUTH_SESSION` | Creates or reuses an authenticated in-memory T3N session for the current identity. | No parameters. Requires a valid local identity file and reachable T3N endpoints for non-local environments. |
-| `FETCH_AGENT_REGISTRATION_RECORD` | Returns the detailed T3N and Hedera registration records for the current agent. | No parameters. Requires `AGENT_IDENTITY_CONFIG_PATH` and a testnet/mainnet identity. |
-| `GET_USER_DID` | Reads stored user DIDs from the current runtime. | Optional parameters: `userDid`, `remark`. With no filters it returns every tracked DID. |
-| `HAS_AGENT_IDENTITY_CONFIG` | Validates the local identity JSON referenced by `AGENT_IDENTITY_CONFIG_PATH`. | No parameters. Requires `AGENT_IDENTITY_CONFIG_PATH` to point to a readable identity file. |
-| `PROFILE_FIELD_MAPPING` | Maps user-friendly profile field names to the T3N JSONPath selectors used for lookup filters. | Parameter: `fields`. Returns supported mappings plus unsupported field names. |
-| `VALIDATE_T3N_AUTH_SESSION` | Confirms that the current in-memory T3N session is authenticated and still usable. | No parameters. Call after `CREATE_T3N_AUTH_SESSION`. |
+### AI agent registration
 
-## CLI Workflows
+Register an agent in both T3N and Hedera ERC-8004 identity registry.
 
-The package ships a `hedera-t3n-plugin` binary.
+1. Ensure the following prerequisites are met:
+   - identity was created with `create-identity`
+   - the configured Hedera account is funded with HBAR for gas
+   - the `agent_card.json` is hosted at a public HTTP(S) `agentURI` and returns valid JSON
 
-```bash
-hedera-t3n-plugin init
-hedera-t3n-plugin create-identity --env testnet --path ./output/identities/agent_identity.json
-hedera-t3n-plugin ipfs-submit-agent-card-pinata --path ./output/identities/agent_identity.json --jwt <PINATA_JWT>
-hedera-t3n-plugin register-agent-erc8004 --env testnet --path ./output/identities/agent_identity.json --agent-uri https://gateway.pinata.cloud/ipfs/<cid>
-```
+2. Run the registration CLI:
 
-- `init` creates local `.env` and `.env.secret.pinata` files from the packaged examples.
-- `register-agent-erc8004` supports `testnet` and `mainnet` only.
-- Registration stays explicit: the plugin exposes registration inspection tools, while publishing the public agent card and writing ERC-8004 state happen through the CLI or programmatic APIs.
+   ```bash
+   npx hedera-t3n-plugin register-agent-erc8004 --agent-uri <public-agent-uri>
+   ```
 
-## Programmatic APIs
+3. The CLI will:
+   - load the local identity config
+   - validate the public `agentURI`
+   - authenticate with the T3N node
+   - register the agent on the T3N agent registry
+   - register the same canonical `did:t3n` and `agentURI` in Hedera ERC-8004
+   - persist registration metadata back to the identity file
 
-```ts
-import {
-  createIdentity,
-  registerAgentErc8004,
-  submitAgentCardToPinata,
-} from "@terminal3/hedera-t3n-plugin";
+## Tools
 
-const identity = await createIdentity({
-  networkTier: "testnet",
-  outputPath: "./output/identities/agent_identity.json",
-});
+### PRIVATE_DATA_PROCESSING
 
-const upload = await submitAgentCardToPinata({
-  identityConfigPath: identity.credentials_path,
-  jwt: process.env.PINATA_JWT,
-});
+Privately process user private data without agent seeing the user data.
 
-const registration = await registerAgentErc8004({
-  networkTier: "testnet",
-  identityConfigPath: identity.credentials_path,
-  agentUri: upload.gatewayUrl,
-});
-```
+Currently, it only supports private checks to verify whether requested user profile fields exist on T3N, without revealing any profile values to the agent. Additional capabilities will be added soon.
 
-## Environment
+**Input**
 
-- `HEDERA_NETWORK`: defaults identity creation to `testnet`; supported values are `local`, `testnet`, and `mainnet`
-- `AGENT_IDENTITY_CONFIG_PATH`: local identity JSON path used by plugin tools and registration helpers
-- `HEDERA_ACCOUNT_ID` / `HEDERA_PRIVATE_KEY`: required for live Hedera registration
-- `PINATA_JWT` or `PINATA_API_KEY` + `PINATA_API_SECRET`: required for the Pinata upload helper
-- `T3N_API_URL`, `T3N_RUNTIME_API_URL`, `T3N_ML_KEM_PUBLIC_KEY(_FILE)`: optional advanced overrides for local CCF or custom T3N environments
-- `T3N_AGENT_REGISTRY_SCRIPT_VERSION`, `T3N_USER_SCRIPT_VERSION`: optional overrides when a target cluster cannot resolve `/api/contracts/current`
-- `T3N_LOCAL_BACKEND=ccf`: opt in to a live local CCF backend when `HEDERA_NETWORK=local`
+- `userDid`: target user `did:t3n`
+- `fields`: list of friendly field names to check
 
-## Development
+**What it does**
 
-```bash
-pnpm install
-pnpm validate
-pnpm test:e2e
-```
+- authenticates agent context when needed
+- maps friendly field names to profile selectors
+- returns only field existence and downstream data-availability context
 
-- `pnpm validate` runs lint, unit tests, integration tests, build, `npm pack --dry-run`, and a tarball smoke-install check
-- `pnpm test:e2e` covers identity validation, registration inspection, session auth, user-DID tracking, profile-field lookup guards, and delegated self-only checks; live registration phases remain opt-in and may require explicit `T3N_API_URL` / `T3N_RUNTIME_API_URL` overrides when the public endpoint does not expose the agent-registry contract
-- additional test guidance lives in `tests/README.md`
+**Returns**
 
-## Release Notes
+- `fieldExistence`: boolean existence flags per requested field
+- `missingFields`: requested fields that are not present
+- `unsupportedFields`: requested fields not supported
+- `guidance`: onboarding/profile URLs and next steps for missing fields
 
-- `2.0.0` is the first public npm/open-source packaging pass for this plugin surface
-- existing user-DID, profile, session, and registration-inspection tools remain available
-- stale legacy compliance wording and GitHub-Packages-only instructions were removed
-- readiness docs: `OPEN_SOURCE_READINESS_MATRIX.md`, `RELEASE_CHECKLIST.md`, `OPEN_SOURCE_NOTES.md`
+**Privacy property**
+
+- the agent never receives raw user profile values
+
+### KYC
+
+[Coming soon] Direct the client (i.e., AI agent developer or end users) to conduct KYC and generate a KYC smart verifiable credential (SVC) / presentation (VP).
+
+## Environment Variables
+
+### Required for CLI
+
+- `AGENT_IDENTITY_CONFIG_PATH`: path to the local agent identity JSON used by CLI flows and private data processing workflows
+- `HEDERA_ACCOUNT_ID`: Hedera account ID used for ERC-8004 registration signing
+- `HEDERA_PRIVATE_KEY`: Hedera private key used for ERC-8004 registration signing
+- `HEDERA_IDENTITY_REGISTRY_ADDRESS`: Hedera ERC-8004 identity registry contract address
+
+### Required for Autonomous Mode
+
+- `HEDERA_NETWORK`: network tier (`local`, `testnet`, or `mainnet`; defaults to `testnet`)
+- `HEDERA_IDENTITY_REGISTRY_ADDRESS`: optional override for the Hedera ERC-8004 identity registry contract address
+- `HEDERA_ACCOUNT_ID`: Hedera account ID
+- `HEDERA_PRIVATE_KEY`: ECDSA private key (`0x...` format)
+
+### Optional
+
+For additional repo-local development, test, and demo configuration options, see `.env.example`.

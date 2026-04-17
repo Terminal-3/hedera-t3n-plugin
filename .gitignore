@@ -26,6 +26,7 @@ config/identity/*.json
 # Editor & IDE
 .idea/
 .vscode/
+.claude/settings.local.json
 *.sublime-project
 *.sublime-workspace
 
@@ -34,3 +35,4 @@ config/identity/*.json
 
 # Packages
 *.tgz
+.tmp

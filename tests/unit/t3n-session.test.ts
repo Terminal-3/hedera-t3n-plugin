@@ -5,14 +5,15 @@ const sdkMocks = vi.hoisted(() => {
   const authenticateMock = vi.fn();
   const isAuthenticatedMock = vi.fn();
   const createEthAuthInputMock = vi.fn((address: string) => ({ address }));
-  const fallbackAuthenticateMock = vi.fn();
   const resolveT3nBaseUrlMock = vi.fn();
   const setEnvironmentMock = vi.fn();
+  const createAuthenticatedT3nClientMock = vi.fn();
 
   class MockT3nClient {
     handshake = handshakeMock;
     authenticate = authenticateMock;
     isAuthenticated = isAuthenticatedMock;
+    getDid = vi.fn(() => ({ toString: () => "did:t3n:mock" }));
   }
 
   return {
@@ -20,9 +21,9 @@ const sdkMocks = vi.hoisted(() => {
     authenticateMock,
     isAuthenticatedMock,
     createEthAuthInputMock,
-    fallbackAuthenticateMock,
     resolveT3nBaseUrlMock,
     setEnvironmentMock,
+    createAuthenticatedT3nClientMock,
     MockT3nClient,
   };
 });
@@ -32,25 +33,24 @@ vi.mock("@terminal3/t3n-sdk", () => ({
   SessionStatus: {
     Authenticated: "Authenticated",
   },
-  createEthAuthInput: sdkMocks.createEthAuthInputMock,
-  createRandomHandler: vi.fn(() => "random-handler"),
   eth_get_address: vi.fn(() => "0x1234567890abcdef1234567890abcdef12345678"),
-  loadWasmComponent: vi.fn(async () => "wasm-component"),
-  metamask_sign: vi.fn(() => "eth-sign-handler"),
+  createEthAuthInput: sdkMocks.createEthAuthInputMock,
   setEnvironment: sdkMocks.setEnvironmentMock,
 }));
 
 vi.mock("../../src/utils/agent-identity-config.js", () => ({
-  readAgentIdentityConfig: vi.fn(async () => ({
-    ok: true,
-    path: "/tmp/test-identity.json",
-    data: { mocked: true },
-  })),
-  resolveAgentIdentityConfigPath: vi.fn(() => ({
-    ok: true,
-    path: "/tmp/test-identity.json",
-  })),
-  validateAgentIdentityConfig: vi.fn(() => ({ ok: true })),
+  loadIdentityOrThrow: vi.fn(() =>
+    Promise.resolve({
+      path: "/tmp/test-identity.json",
+      data: { mocked: true },
+      credentials: {
+        did_t3n: "did:t3n:d6ee025dd9e8ddcb7dfcc18cbdff413101ceaa9f",
+        private_key:
+          "0x59c6995e998f97a5a004497e5daef7f8f4a47b09f03c87f13f6f6d0d7138f5f4",
+        network_tier: "testnet",
+      },
+    })
+  ),
 }));
 
 vi.mock("../../src/utils/env.js", () => ({
@@ -58,21 +58,22 @@ vi.mock("../../src/utils/env.js", () => ({
   shouldUseLiveLocalT3nBackend: vi.fn(() => false),
 }));
 
+vi.mock("../../src/utils/t3n-endpoint.js", () => ({
+  isLocalhostUrl: vi.fn((url: string) =>
+    url.includes("localhost") || url.includes("127.0.0.1")
+  ),
+}));
+
 vi.mock("../../src/utils/t3n-ml-kem.js", () => ({
   createConfiguredMlKemPublicKeyHandler: vi.fn(() => "ml-kem-handler"),
 }));
 
 vi.mock("../../src/utils/t3n.js", () => ({
-  authenticateT3nClientWithEthDidSuffix: sdkMocks.fallbackAuthenticateMock,
+  authenticateT3nClientWithEthDidSuffix: vi.fn(),
+  inferT3nEnvFromUrl: vi.fn(() => "local"),
+  normalizeT3nDid: (did: string) => did,
   resolveT3nBaseUrl: sdkMocks.resolveT3nBaseUrlMock,
-}));
-
-vi.mock("../../src/utils/validation.js", () => ({
-  validateStoredCredentials: vi.fn(() => ({
-    did_t3n: "did:t3n:a:stored",
-    private_key: "0xabc123",
-    network_tier: "testnet",
-  })),
+  createAuthenticatedT3nClient: sdkMocks.createAuthenticatedT3nClientMock,
 }));
 
 import {
@@ -81,14 +82,16 @@ import {
 } from "../../src/utils/t3n-session.js";
 
 describe("t3n-session authentication", () => {
+  let mockClient: InstanceType<typeof sdkMocks.MockT3nClient>;
+
   beforeEach(() => {
+    mockClient = new sdkMocks.MockT3nClient();
     sdkMocks.resolveT3nBaseUrlMock.mockResolvedValue("http://127.0.0.1:3000");
-    sdkMocks.handshakeMock.mockResolvedValue(undefined);
     sdkMocks.isAuthenticatedMock.mockReturnValue(true);
-    sdkMocks.authenticateMock.mockReset();
-    sdkMocks.fallbackAuthenticateMock.mockReset();
-    sdkMocks.createEthAuthInputMock.mockClear();
-    sdkMocks.setEnvironmentMock.mockClear();
+    sdkMocks.createAuthenticatedT3nClientMock.mockResolvedValue({
+      client: mockClient,
+      did: "did:t3n:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    });
     resetT3nSessionStateForTests();
   });
 
@@ -97,31 +100,32 @@ describe("t3n-session authentication", () => {
     resetT3nSessionStateForTests();
   });
 
-  it("uses SDK authenticate when it succeeds", async () => {
-    sdkMocks.authenticateMock.mockResolvedValue({
-      toString: () => "did:t3n:a:from-sdk",
-    });
-
+  it("delegates live authentication through the shared T3N client factory", async () => {
     const result = await createOrReuseT3nSessionFromIdentity({
       env: { HEDERA_T3N_LIVE_SESSION: "1" } as NodeJS.ProcessEnv,
     });
 
-    expect(result.did).toBe("did:t3n:a:from-sdk");
-    expect(sdkMocks.createEthAuthInputMock).toHaveBeenCalledWith(
-      "0x1234567890abcdef1234567890abcdef12345678"
+    expect(result.did).toBe("did:t3n:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb");
+    expect(sdkMocks.createAuthenticatedT3nClientMock).toHaveBeenCalledTimes(1);
+    expect(sdkMocks.createAuthenticatedT3nClientMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        privateKey:
+          "0x59c6995e998f97a5a004497e5daef7f8f4a47b09f03c87f13f6f6d0d7138f5f4",
+        baseUrl: "http://127.0.0.1:3000",
+      })
     );
-    expect(sdkMocks.fallbackAuthenticateMock).not.toHaveBeenCalled();
   });
 
-  it("falls back to explicit auth flow when SDK authenticate fails", async () => {
-    sdkMocks.authenticateMock.mockRejectedValue(new Error("sdk auth failed"));
-    sdkMocks.fallbackAuthenticateMock.mockResolvedValue("did:t3n:a:from-fallback");
-
+  it("reuses existing valid session", async () => {
+    await createOrReuseT3nSessionFromIdentity({
+      env: { HEDERA_T3N_LIVE_SESSION: "1" } as NodeJS.ProcessEnv,
+    });
+    
     const result = await createOrReuseT3nSessionFromIdentity({
       env: { HEDERA_T3N_LIVE_SESSION: "1" } as NodeJS.ProcessEnv,
     });
 
-    expect(result.did).toBe("did:t3n:a:from-fallback");
-    expect(sdkMocks.fallbackAuthenticateMock).toHaveBeenCalledTimes(1);
+    expect(result.reused).toBe(true);
+    expect(sdkMocks.createAuthenticatedT3nClientMock).toHaveBeenCalledTimes(1);
   });
 });

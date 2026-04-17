@@ -17,51 +17,195 @@ import type {
   StoredT3nRegistrationMetadata,
 } from "./storage.js";
 
-/**
- * Regex pattern for validating did:key format (W3C DID standard).
- *
- * Matches the base58btc alphabet used in did:key identifiers:
- * - Characters: 123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz
- * - Deliberately excludes 0, O, I, and l to avoid visual ambiguity
- * - The 'z' prefix indicates base58btc encoding in multicodec format
- *
- * This pattern ensures compatibility with W3C DID Core specification and
- * prevents common errors from ambiguous character usage.
- */
-export const DID_KEY_REGEX = /^did:key:z[1-9A-HJ-NP-Za-km-z]+$/;
-/**
- * Regex pattern for validating T3N agent DID format.
- *
- * Matches the currently observed agent DID formats:
- * - Canonical format: did:t3n:a:{suffix}
- * - Local CCF format: did:t3:a:{suffix}
- * - Suffix: hex characters and hyphens (e.g., UUID format: abc123-def-456)
- * - Case-insensitive hex matching for flexibility
- */
-export const DID_T3N_REGEX = /^did:t3n?:a:[a-f0-9-]+$/i;
+import {
+  DID_T3N_REGEX,
+  ETH_ADDRESS_REGEX,
+  HEDERA_WALLET_REGEX,
+  PRIVATE_KEY_REGEX,
+  PUBLIC_KEY_REGEX,
+} from "./identity-utils.js";
+
+export {
+  DID_T3N_REGEX,
+  ETH_ADDRESS_REGEX,
+  HEDERA_WALLET_REGEX,
+  PRIVATE_KEY_REGEX,
+  PUBLIC_KEY_REGEX,
+};
 
 /**
- * Regex pattern for validating Hedera wallet addresses (Ethereum-compatible).
- *
- * Matches standard Ethereum address format: 0x followed by exactly 40 hex characters.
- * Case-insensitive to handle addresses in either case.
+ * Returns true when value is a non-empty string after trimming.
  */
-export const HEDERA_WALLET_REGEX = /^0x[0-9a-f]{40}$/i;
+export function isNonEmptyString(value: unknown): value is string {
+  return typeof value === "string" && value.trim() !== "";
+}
 
 /**
- * Regex pattern for validating private keys (secp256k1).
- *
- * Matches standard secp256k1 private key format: 0x followed by exactly 64 hex characters
- * (32 bytes). Case-insensitive for consistency with address validation.
+ * Returns true when value is a plain JSON-like object.
  */
-export const PRIVATE_KEY_REGEX = /^0x[0-9a-f]{64}$/i;
+export function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
+
+/**
+ * Reads a trimmed non-empty string field from a record.
+ */
+export function readNonEmptyString(
+  record: Record<string, unknown>,
+  key: string
+): string | undefined {
+  const value = record[key];
+  if (typeof value !== "string") {
+    return undefined;
+  }
+
+  const normalized = value.trim();
+  return normalized === "" ? undefined : normalized;
+}
+
+/**
+ * Reads a positive integer field from a record.
+ */
+export function readPositiveInteger(
+  record: Record<string, unknown>,
+  key: string
+): number | undefined {
+  const value = record[key];
+  return typeof value === "number" && Number.isInteger(value) && value > 0
+    ? value
+    : undefined;
+}
+
+/**
+ * Zod schema for validating AgentCardEndpoint.
+ */
+export const agentCardEndpointSchema = z.object({
+  name: z.string().min(1),
+  endpoint: z.string().min(1),
+  version: z.string().min(1),
+});
+
+export type AgentCardEndpoint = z.infer<typeof agentCardEndpointSchema>;
+
+/**
+ * JWK shape accepted in agent-card verificationMethod entries.
+ * secp256k1 keys (EC, x + y) are the default; Ed25519 (OKP, x only) is accepted
+ * as a secondary algorithm.
+ */
+export const publicKeyJwkSchema = z
+  .object({
+    kty: z.enum(["EC", "OKP"]),
+    crv: z.enum(["secp256k1", "Ed25519"]),
+    x: z.string().min(1),
+    y: z.string().min(1).optional(),
+    alg: z.enum(["ES256K", "EdDSA"]).optional(),
+    use: z.literal("sig").optional(),
+    kid: z.string().min(1).optional(),
+  })
+  .passthrough()
+  .superRefine((jwk, ctx) => {
+    if (jwk.kty === "EC" && jwk.crv === "secp256k1" && !jwk.y) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "secp256k1 JWK requires 'y' coordinate.",
+      });
+    }
+    if (jwk.kty === "OKP" && jwk.crv !== "Ed25519") {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "OKP JWK only supports crv=Ed25519 here.",
+      });
+    }
+    if (jwk.kty === "EC" && jwk.crv !== "secp256k1") {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "EC JWK only supports crv=secp256k1 here.",
+      });
+    }
+  });
+
+export type PublicKeyJwk = z.infer<typeof publicKeyJwkSchema>;
+
+/**
+ * Zod schema for a single verificationMethod entry (W3C DID-Document shape,
+ * restricted to JsonWebKey2020).
+ */
+export const verificationMethodSchema = z
+  .object({
+    id: z.string().min(1),
+    type: z.literal("JsonWebKey2020"),
+    controller: z.string().min(1),
+    publicKeyJwk: publicKeyJwkSchema,
+  })
+  .strict();
+
+export type VerificationMethod = z.infer<typeof verificationMethodSchema>;
+
+/**
+ * Zod schema for validating AgentCardRecord.
+ *
+ * INVARIANT: `verificationMethod` is optional during the M0–M2 migration window
+ * and becomes required in M3 (see PLAN §Compatibility / Migration). When
+ * present, every entry must validate.
+ */
+export const agentCardRecordSchema = z.object({
+  type: z.string().min(1),
+  name: z.string().min(1),
+  description: z.string().min(1),
+  endpoints: z.array(agentCardEndpointSchema).min(1),
+  x402Support: z.boolean(),
+  active: z.boolean(),
+  supportedTrust: z.array(z.string()),
+  verificationMethod: z.array(verificationMethodSchema).min(1).optional(),
+  authentication: z.array(z.string().min(1)).optional(),
+  assertionMethod: z.array(z.string().min(1)).optional(),
+}).passthrough();
+
+export type AgentCardRecord = z.infer<typeof agentCardRecordSchema>;
+
+/**
+ * Selects the verificationMethod entry that should be used to verify inbound
+ * request signatures for a given DID. Prefers entries referenced from
+ * `authentication`; falls back to the first `verificationMethod` entry.
+ * Returns null when no key is published.
+ */
+export function selectAuthenticationKey(
+  card: AgentCardRecord
+): VerificationMethod | null {
+  const methods = card.verificationMethod;
+  if (!methods || methods.length === 0) {
+    return null;
+  }
+  const auth = card.authentication;
+  if (auth && auth.length > 0) {
+    for (const ref of auth) {
+      const match = methods.find((m) => m.id === ref);
+      if (match) {
+        return match;
+      }
+    }
+  }
+  return methods[0] ?? null;
+}
+
+/**
+ * Zod schema for validating AgentRegistryRecord.
+ */
+export const agentRegistryRecordSchema = z.object({
+  agent_uri: z.string().min(1),
+  registered_at: z.number().int(),
+  updated_at: z.number().int(),
+  owner: z.string().regex(ETH_ADDRESS_REGEX),
+});
+
+export type AgentRegistryRecord = z.infer<typeof agentRegistryRecordSchema>;
 
 /**
  * Zod schema for validating StoredCredentials structure.
  *
  * Validates all fields of stored credential files including version, timestamps,
- * DID formats, wallet addresses, and private keys. Used by the HAS_AGENT_IDENTITY_CONFIG
- * tool and other credential loading functions to ensure data integrity.
+ * DID formats, wallet addresses, and private keys. Used by the public auth-context /
+ * private-data-processing workflows and other credential loading functions to ensure data integrity.
  *
  * All string fields use regex validation to enforce format requirements.
  */
@@ -84,11 +228,11 @@ const storedHederaRegistrationMetadataSchema = z.object({
 export const storedCredentialsSchema = z.object({
   version: z.number().int().positive(),
   created_at: z.string(),
-  did_key: z.string().regex(DID_KEY_REGEX),
   did_t3n: z.string().regex(DID_T3N_REGEX),
   hedera_wallet: z.string().regex(HEDERA_WALLET_REGEX),
   network_tier: z.enum(["local", "testnet", "mainnet"]),
   private_key: z.string().regex(PRIVATE_KEY_REGEX),
+  public_key: z.string().regex(PUBLIC_KEY_REGEX),
   agent_card_path: z.string().min(1).optional(),
   agent_card_cid: z.string().min(1).optional(),
   agent_card_gateway_url: z.string().min(1).optional(),

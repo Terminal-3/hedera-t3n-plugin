@@ -2,7 +2,15 @@ import { mkdtempSync, rmSync, writeFileSync } from "fs";
 import os from "os";
 import path from "path";
 
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
+
+const sdkMocks = vi.hoisted(() => ({
+  createMlKemPublicKeyHandler: vi.fn(),
+}));
+
+vi.mock("@terminal3/t3n-sdk", () => ({
+  createMlKemPublicKeyHandler: sdkMocks.createMlKemPublicKeyHandler,
+}));
 
 import {
   createConfiguredMlKemPublicKeyHandler,
@@ -20,6 +28,7 @@ describe("T3N ML-KEM public key override resolution", () => {
       rmSync(tempDir, { recursive: true, force: true });
       tempDir = undefined;
     }
+    vi.clearAllMocks();
   });
 
   it("prefers inline base64 override", () => {
@@ -67,8 +76,17 @@ describe("T3N ML-KEM public key override resolution", () => {
       T3N_ML_KEM_PUBLIC_KEY_FILE: keyPath,
     });
     const response = JSON.parse(new TextDecoder().decode(await handler()));
-
     expect(response.host_to_guest).toBe("MlKemPublicKey");
     expect(response.key).toEqual(Array.from(SAMPLE_BYTES));
+  });
+
+  it("falls back to SDK ML-KEM handler when no override is configured", () => {
+    const delegatedHandler = vi.fn();
+    sdkMocks.createMlKemPublicKeyHandler.mockReturnValue(delegatedHandler);
+
+    const handler = createConfiguredMlKemPublicKeyHandler({}, "https://node.example");
+    expect(handler).toBe(delegatedHandler);
+    expect(sdkMocks.createMlKemPublicKeyHandler).toHaveBeenCalledTimes(1);
+    expect(sdkMocks.createMlKemPublicKeyHandler).toHaveBeenCalledWith("https://node.example");
   });
 });

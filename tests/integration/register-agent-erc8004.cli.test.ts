@@ -177,7 +177,7 @@ describe("registerAgentErc8004", () => {
 
   it("formats dual-registration output clearly", () => {
     const message = formatRegisterAgentErc8004Message({
-      did: "did:t3n:a:test123",
+      did: "did:t3n:06d8e43f337652f8effac7f5218cb8fdab5cd286",
       agentUri: "https://agent.example/.well-known/agent_card.json",
       verified: true,
       network: "testnet",

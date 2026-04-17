@@ -4,7 +4,7 @@ const OWNER_ONLY_FILE_MODE = 0o600;
 
 export async function ensureOwnerOnlyFilePermissions(
   path: string,
-  label: string = "sensitive file"
+  label: string = path
 ): Promise<void> {
   try {
     await chmod(path, OWNER_ONLY_FILE_MODE);
@@ -14,7 +14,9 @@ export async function ensureOwnerOnlyFilePermissions(
       return;
     }
     if (process.env.NODE_ENV !== "test") {
-      console.warn(`Warning: Could not set restrictive permissions on the ${label}.`);
+      console.warn(
+        `Warning: Could not set restrictive permissions on ${label}. File may be accessible to other users.`
+      );
     }
   }
 }

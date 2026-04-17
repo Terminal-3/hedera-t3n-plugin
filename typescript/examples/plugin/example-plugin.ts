@@ -14,10 +14,9 @@ const createT3nBootstrapGuideTool = (_context: Context): Tool => ({
     const steps = [
       "Run `pnpm create-identity` in the plugin package.",
       "Set `AGENT_IDENTITY_CONFIG_PATH` to the generated identity file.",
-      "Call `HAS_AGENT_IDENTITY_CONFIG` to validate local readiness.",
-      "Call `CREATE_T3N_AUTH_SESSION` before profile-related tools.",
-      "Store or query user DIDs with `ADD_USER_DID` and `GET_USER_DID` as needed.",
-      "Use registration inspection tools after explicit CLI registration.",
+      "Call `AUTH_AGENT_CONTEXT` to inspect identity/session/registration readiness.",
+      "Call `PRIVATE_DATA_PROCESSING` when you need privacy-preserving profile field checks.",
+      "Use CLI/programmatic registration flows when explicit registration changes are required.",
     ];
 
     return {
@@ -25,7 +24,8 @@ const createT3nBootstrapGuideTool = (_context: Context): Tool => ({
         success: true,
         steps,
       },
-      humanMessage: `Recommended bootstrap order:\n- ${steps.join("\n- ")}`,
+      humanMessage: `Recommended bootstrap order:
+- ${steps.join("\n- ")}`,
     };
   },
 });

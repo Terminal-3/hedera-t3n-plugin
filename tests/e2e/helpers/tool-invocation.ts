@@ -29,6 +29,17 @@ type ToolCall = {
   };
 };
 
+type AgentState = {
+  values?: {
+    messages?: AgentMessage[];
+  };
+};
+
+type InvokeToolDiagnostics = {
+  parsedToolNames: string[];
+  parsedToolData: ToolCall[];
+};
+
 type InvokeToolOptions = {
   agent: AgentSetup["agent"];
   cleanup?: () => void;
@@ -45,7 +56,7 @@ type InvokeToolOptions = {
   allowedToolNames?: string[];
 };
 
-const TOOL_CALL_HINT = "Use a model that supports tool calling (e.g. ollama pull qwen2.5).";
+const TOOL_CALL_HINT = "Use a model that supports tool calling (e.g. ollama pull gemma4:latest).";
 const DEBUG_HEADER = "--- Debug: response.messages summary ---";
 const DEBUG_FOOTER = "--- End debug ---";
 
@@ -118,7 +129,7 @@ async function invokeWithStateFallback(
     const statefulAgent = agent as AgentSetup["agent"] & {
       getState?: (config: {
         configurable: { thread_id: string };
-      }) => Promise<{ values?: { messages?: AgentMessage[] } }>;
+      }) => Promise<AgentState>;
     };
 
     if (typeof statefulAgent.getState !== "function") {
@@ -126,10 +137,10 @@ async function invokeWithStateFallback(
       throw error;
     }
 
-    const state = await statefulAgent.getState({
+    const state = (await statefulAgent.getState({
       configurable: { thread_id: threadId },
-    });
-    const recoveredMessages = Array.isArray(state?.values?.messages)
+    })) as AgentState;
+    const recoveredMessages = Array.isArray(state.values?.messages)
       ? state.values.messages
       : [];
 
@@ -158,7 +169,11 @@ export async function invokeAgentTool({
   requireExactlyOneMatchingToolCall = false,
   disallowUnexpectedToolCalls = false,
   allowedToolNames,
-}: InvokeToolOptions): Promise<{ toolCall: ToolCall; response: AgentResponse }> {
+}: InvokeToolOptions): Promise<{
+  toolCall: ToolCall;
+  response: AgentResponse;
+  diagnostics: InvokeToolDiagnostics;
+}> {
   const matchesExpectedTool = (candidate?: ToolCall): boolean =>
     Boolean(candidate?.toolName && expectedToolNames.includes(candidate.toolName));
 
@@ -171,9 +186,7 @@ export async function invokeAgentTool({
     timeoutMs
   );
 
-  const allParsedToolData = responseParser.parseNewToolMessages(
-    response as unknown as Record<string, unknown>
-  ) as ToolCall[];
+  const allParsedToolData = responseParser.parseNewToolMessages(response as AgentResponse) as ToolCall[];
   let toolCall = selectPreferredToolCall(allParsedToolData, matchesExpectedTool);
 
   if ((!toolCall || !matchesExpectedTool(toolCall)) && (response.messages?.length ?? 0) <= 2) {
@@ -185,9 +198,7 @@ export async function invokeAgentTool({
       recursionLimit,
       timeoutMs
     );
-    const followUpParsedToolData = responseParser.parseNewToolMessages(
-      response as unknown as Record<string, unknown>
-    ) as ToolCall[];
+    const followUpParsedToolData = responseParser.parseNewToolMessages(response as AgentResponse) as ToolCall[];
     allParsedToolData.push(...followUpParsedToolData);
     toolCall = selectPreferredToolCall(allParsedToolData, matchesExpectedTool);
   }
@@ -229,13 +240,20 @@ export async function invokeAgentTool({
     throw new Error(
       formatToolFailureMessage(
         response.messages ?? [],
-        allParsedToolData.length,
+        allParsedToolData,
         expectedToolLabel
       )
     );
   }
 
-  return { toolCall, response };
+  return {
+    toolCall,
+    response,
+    diagnostics: {
+      parsedToolNames: collectToolNames(allParsedToolData),
+      parsedToolData: allParsedToolData,
+    },
+  };
 }
 
 function formatStrictToolFailureMessage(params: {
@@ -243,9 +261,7 @@ function formatStrictToolFailureMessage(params: {
   reason: string;
   parsedToolData: ToolCall[];
 }): string {
-  const parsedToolNames = collectToolNames(params.parsedToolData);
-  const parsedToolsDescription =
-    parsedToolNames.length > 0 ? parsedToolNames.join(", ") : "none";
+  const parsedToolsDescription = formatParsedToolData(params.parsedToolData);
 
   return [
     `LLM tool invocation policy failed for ${params.expectedToolLabel}.`,
@@ -253,6 +269,19 @@ function formatStrictToolFailureMessage(params: {
     `Captured tool calls: ${parsedToolsDescription}`,
     TOOL_CALL_HINT,
   ].join("\n");
+}
+
+function formatParsedToolData(parsedToolData: ToolCall[]): string {
+  if (parsedToolData.length === 0) {
+    return "none";
+  }
+
+  return parsedToolData
+    .map((toolCall, index) => {
+      const toolName = toolCall.toolName?.trim() || "unknown";
+      return `[${index}] ${toolName} raw=${JSON.stringify(toolCall.parsedData?.raw)}`;
+    })
+    .join("\n");
 }
 
 function formatAgentMessagesSummary(messages: AgentMessage[]): string {
@@ -287,7 +316,7 @@ function formatAgentMessagesSummary(messages: AgentMessage[]): string {
 
 function formatToolFailureMessage(
   messages: AgentMessage[],
-  parsedCount: number,
+  parsedToolData: ToolCall[],
   expectedToolLabel: string
 ): string {
   const debugSummary = formatAgentMessagesSummary(messages);
@@ -296,7 +325,8 @@ function formatToolFailureMessage(
     TOOL_CALL_HINT,
     DEBUG_HEADER,
     debugSummary,
-    `parsedNewToolMessages length: ${parsedCount}`,
+    `parsedNewToolMessages length: ${parsedToolData.length}`,
+    `parsedNewToolMessages summary:\n${formatParsedToolData(parsedToolData)}`,
     DEBUG_FOOTER,
   ].join("\n");
 }

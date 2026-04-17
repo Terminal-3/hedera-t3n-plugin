@@ -7,6 +7,12 @@
 
 import type { NetworkTier } from "../createIdentity.js";
 import { getIdentityEnvironment } from "../utils/env.js";
+import {
+  assertEnumFlagValue,
+  buildUnexpectedPositionalArgError,
+  buildUnknownFlagError,
+  tryReadFlag,
+} from "./arg-utils.js";
 
 const NETWORK_TIERS: Array<Exclude<NetworkTier, "local">> = ["testnet", "mainnet"];
 const REGISTER_AGENT_SUPPORTED_FLAGS = "--env, --path/-p, --agent-uri";
@@ -26,82 +32,35 @@ export function parseRegisterAgentErc8004Args(
   let pathArg: string | undefined;
   let agentUriArg: string | undefined;
 
-  for (let i = 0; i < argv.length; i += 1) {
+  for (let i = 0; i < argv.length; ) {
     const arg = argv[i];
-    if (arg.startsWith("--env=")) {
-      const value = arg.slice("--env=".length).trim();
-      if (!value) {
-        throw new Error("Missing value for --env");
-      }
-      if (!NETWORK_TIERS.includes(value as (typeof NETWORK_TIERS)[number])) {
-        throw new Error(
-          `Invalid value for --env: "${value}". Supported values: ${NETWORK_TIERS.join(", ")}`
-        );
-      }
-      networkTier = value as Exclude<NetworkTier, "local">;
+
+    const envMatch = tryReadFlag(argv, i, "--env");
+    if (envMatch) {
+      networkTier = assertEnumFlagValue("--env", envMatch.value, NETWORK_TIERS);
+      i += envMatch.consumedCount;
       continue;
     }
-    if (arg === "--env") {
-      const next = argv[i + 1];
-      if (!next || next.startsWith("-")) {
-        throw new Error("Missing value for --env");
-      }
-      if (!NETWORK_TIERS.includes(next as (typeof NETWORK_TIERS)[number])) {
-        throw new Error(
-          `Invalid value for --env: "${next}". Supported values: ${NETWORK_TIERS.join(", ")}`
-        );
-      }
-      networkTier = next as Exclude<NetworkTier, "local">;
-      i += 1;
+
+    const pathMatch = tryReadFlag(argv, i, "--path", "-p");
+    if (pathMatch) {
+      pathArg = pathMatch.value;
+      i += pathMatch.consumedCount;
       continue;
     }
-    if (arg.startsWith("--path=")) {
-      const value = arg.slice("--path=".length);
-      if (!value) {
-        throw new Error("Missing value for --path");
-      }
-      pathArg = value;
-      continue;
-    }
-    if (arg === "--path" || arg === "-p") {
-      const next = argv[i + 1];
-      if (!next || next.startsWith("-")) {
-        throw new Error("Missing value for --path");
-      }
-      pathArg = next;
-      i += 1;
-      continue;
-    }
-    if (arg.startsWith("--agent-uri=")) {
-      const value = arg.slice("--agent-uri=".length).trim();
-      if (!value) {
-        throw new Error("Missing value for --agent-uri");
-      }
-      agentUriArg = value;
-      continue;
-    }
-    if (arg === "--agent-uri") {
-      const next = argv[i + 1];
-      if (!next || next.startsWith("-")) {
-        throw new Error("Missing value for --agent-uri");
-      }
-      agentUriArg = next.trim();
-      if (!agentUriArg) {
-        throw new Error("Missing value for --agent-uri");
-      }
-      i += 1;
+
+    const agentUriMatch = tryReadFlag(argv, i, "--agent-uri");
+    if (agentUriMatch) {
+      agentUriArg = agentUriMatch.value;
+      i += agentUriMatch.consumedCount;
       continue;
     }
 
     if (arg.startsWith("-")) {
-      throw new Error(
-        `Unknown argument: "${arg}". Supported flags: ${REGISTER_AGENT_SUPPORTED_FLAGS}`
-      );
+      throw buildUnknownFlagError(arg, REGISTER_AGENT_SUPPORTED_FLAGS);
     }
 
-    throw new Error(
-      `Unexpected positional argument: "${arg}". Supported flags: ${REGISTER_AGENT_SUPPORTED_FLAGS}`
-    );
+    throw buildUnexpectedPositionalArgError(arg, REGISTER_AGENT_SUPPORTED_FLAGS);
   }
 
   return { networkTier, pathArg, agentUriArg };

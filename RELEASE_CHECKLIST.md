@@ -1,31 +1,49 @@
 # Release Checklist
 
-Use this checklist before publishing a new version of `@terminal3/hedera-t3n-plugin` or updating its public submission docs.
+Use this checklist before publishing a new public release of `@terminal3/hedera-t3n-plugin`.
 
-## Repo And Docs
+## Pre-Release
 
-- [ ] Confirm `README.md` matches the current plugin exports, CLI commands, and environment requirements.
-- [ ] Confirm `OPEN_SOURCE_NOTES.md` and `OPEN_SOURCE_READINESS_MATRIX.md` still reflect the current package scope.
-- [ ] Confirm links to the GitHub repo, npm package, and issue tracker are correct.
+1. Confirm the README, readiness matrix, and migration notes match the shipped tool surface.
+2. Verify `package.json` metadata (`version`, `exports`, `files`, `engines`, `publishConfig.access`).
+3. Confirm `.env.example` and `.env.secret.pinata.example` are current and contain placeholders only.
+4. Review `OPEN_SOURCE_READINESS_MATRIX.md` and close any non-manual items.
 
 ## Validation
 
-- [ ] `pnpm lint`
-- [ ] `pnpm test`
-- [ ] `pnpm build`
-- [ ] `pnpm run pack:dry-run`
-- [ ] `pnpm run pack:smoke-install`
-- [ ] Run any additional targeted integration or e2e coverage needed for changed areas.
+```bash
+pnpm install
+pnpm validate
+```
+
+Optional live verification when credentials and infrastructure are available:
+
+```bash
+pnpm test:e2e -- --ipfs-pinata
+```
+
+## Security and Packaging
+
+1. Ensure no secrets, generated identities, or local `.env` files are tracked.
+2. Confirm `npm pack --dry-run` only includes the intended runtime assets and release docs.
+3. Verify the tarball smoke-install still imports the package and exposes the CLI.
 
 ## Publish
 
-- [ ] Verify `package.json` version matches the intended release.
-- [ ] Review `npm view @terminal3/hedera-t3n-plugin version` to avoid accidental duplicate publishes.
-- [ ] Publish from a clean working tree with the expected npm account.
-- [ ] Re-check the npm package page after publish for README and metadata correctness.
+```bash
+pnpm release
+```
 
-## Submission Follow-Up
+That command runs the validation suite, publishes the package with public access, and creates the local release tag.
 
-- [ ] Update the tested version mentioned in any Hedera Agent Kit listing PR.
-- [ ] Keep the upstream PR description aligned with the released npm version and repository README.
-- [ ] Optionally open any related ecosystem follow-up PRs, such as ElizaOS plugin registration, as separate changes.
+After publish succeeds:
+
+```bash
+git push origin hedera-t3n-plugin-v<version>
+```
+
+## Post-Publish
+
+1. Publish release notes that call out the public npm install path and preserved runtime features.
+2. Update Hedera Agent Kit third-party plugin listings if needed.
+3. Verify the npm page and install command work from a clean consumer environment.

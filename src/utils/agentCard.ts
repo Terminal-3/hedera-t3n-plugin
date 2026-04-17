@@ -1,5 +1,18 @@
 import { readFile, writeFile } from "fs/promises";
 import { dirname, join, resolve } from "path";
+import {
+  agentCardRecordSchema,
+  type AgentCardEndpoint,
+  type AgentCardRecord,
+  type VerificationMethod,
+} from "./validation.js";
+import { jwkFromSecp256k1PublicKey } from "./jwk.js";
+
+export {
+  agentCardRecordSchema,
+  type AgentCardEndpoint,
+  type AgentCardRecord,
+};
 
 function getAgentCardDid(identity: AgentIdentityRecord): string | undefined {
   const didT3n = String(identity.did_t3n ?? "").trim();
@@ -16,26 +29,9 @@ function sanitizeAgentCardFilename(filename: string): string {
 }
 
 export interface AgentIdentityRecord {
-  did_key: string;
   did_t3n: string;
   hedera_wallet: string;
-  [key: string]: unknown;
-}
-
-export interface AgentCardEndpoint {
-  name: string;
-  endpoint: string;
-  version: string;
-}
-
-export interface AgentCardRecord {
-  type: string;
-  name: string;
-  description: string;
-  endpoints: AgentCardEndpoint[];
-  x402Support: boolean;
-  active: boolean;
-  supportedTrust: string[];
+  public_key: string;
   [key: string]: unknown;
 }
 
@@ -56,6 +52,15 @@ export function getAgentCardPath(
   return join(dirname(resolve(identityPath)), getAgentCardFilename(identity));
 }
 
+export function assertJsonObjectShape(
+  data: unknown,
+  errorMessage: string
+): asserts data is Record<string, unknown> {
+  if (!data || typeof data !== "object" || Array.isArray(data)) {
+    throw new Error(errorMessage);
+  }
+}
+
 export function parseJsonObject(raw: string, context: string): Record<string, unknown> {
   let parsed: unknown;
   try {
@@ -64,10 +69,7 @@ export function parseJsonObject(raw: string, context: string): Record<string, un
     throw new Error(`${context} contains invalid JSON`);
   }
 
-  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
-    throw new Error(`${context} must contain a JSON object`);
-  }
-
+  assertJsonObjectShape(parsed, `${context} must contain a JSON object`);
   return parsed as Record<string, unknown>;
 }
 
@@ -75,16 +77,18 @@ export function createDefaultAgentCard(
   identity: AgentIdentityRecord
 ): AgentCardRecord {
   const didT3n = String(identity.did_t3n ?? "").trim();
-  const didKey = String(identity.did_key ?? "").trim();
   const hederaWallet = String(identity.hedera_wallet ?? "").trim();
+  const publicKey = String(identity.public_key ?? "").trim();
 
-  if (!didT3n || !didKey || !hederaWallet) {
+  if (!didT3n || !hederaWallet || !publicKey) {
     throw new Error(
-      "Identity JSON is missing required fields for agent card generation: did_t3n, did_key, hedera_wallet"
+      "Identity JSON is missing required fields for agent card generation: did_t3n, hedera_wallet, public_key"
     );
   }
 
   const didFragment = didT3n.split(":").pop() ?? "agent";
+
+  const verificationMethod = buildVerificationMethod(didT3n, publicKey);
 
   return {
     type: "https://eips.ethereum.org/EIPS/eip-8004#registration-v1",
@@ -97,11 +101,6 @@ export function createDefaultAgentCard(
         version: "v1",
       },
       {
-        name: "DID Key",
-        endpoint: didKey,
-        version: "v1",
-      },
-      {
         name: "Hedera Wallet",
         endpoint: hederaWallet,
         version: "v1",
@@ -110,6 +109,20 @@ export function createDefaultAgentCard(
     x402Support: false,
     active: true,
     supportedTrust: ["tee-attestation"],
+    verificationMethod: [verificationMethod],
+    authentication: [verificationMethod.id],
+  };
+}
+
+function buildVerificationMethod(
+  didT3n: string,
+  publicKey: string
+): VerificationMethod {
+  return {
+    id: `${didT3n}#keys-1`,
+    type: "JsonWebKey2020",
+    controller: didT3n,
+    publicKeyJwk: jwkFromSecp256k1PublicKey(publicKey),
   };
 }
 
@@ -121,9 +134,10 @@ export async function loadOrCreateAgentCard(params: {
 
   try {
     const existing = await readFile(agentCardPath, "utf8");
+    const parsed = JSON.parse(existing);
     return {
       agentCardPath,
-      agentCard: parseJsonObject(existing, "Agent card file") as AgentCardRecord,
+      agentCard: agentCardRecordSchema.parse(parsed),
       created: false,
     };
   } catch (error) {
