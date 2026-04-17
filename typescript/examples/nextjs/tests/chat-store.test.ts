@@ -47,7 +47,7 @@ describe("chat store", () => {
     await switchToTempDir();
 
     await appendGuidedAction("chat-b", {
-      action: "HAS_AGENT_IDENTITY_CONFIG",
+      action: "AUTH_AGENT_CONTEXT",
       params: {},
       result: { success: true },
       humanMessage: "ready",
@@ -56,6 +56,6 @@ describe("chat store", () => {
 
     const session = await loadChatSession("chat-b");
     expect(session.guidedActions).toHaveLength(1);
-    expect(session.guidedActions[0]?.action).toBe("HAS_AGENT_IDENTITY_CONFIG");
+    expect(session.guidedActions[0]?.action).toBe("AUTH_AGENT_CONTEXT");
   });
 });

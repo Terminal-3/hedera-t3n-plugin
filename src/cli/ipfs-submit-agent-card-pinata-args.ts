@@ -5,6 +5,12 @@
  * Outputs: Parsed arguments for Pinata upload
  */
 
+import {
+  buildUnexpectedPositionalArgError,
+  buildUnknownFlagError,
+  tryReadFlag,
+} from "./arg-utils.js";
+
 export type IpfsSubmitAgentCardPinataArgs = {
   jwt?: string;
   apiKey?: string;
@@ -21,98 +27,42 @@ export function parseIpfsSubmitAgentCardPinataArgs(
   let apiSecret: string | undefined;
   let pathArg: string | undefined;
 
-  for (let i = 0; i < argv.length; i += 1) {
+  for (let i = 0; i < argv.length; ) {
     const arg = argv[i];
-    if (arg.startsWith("--jwt=")) {
-      const value = arg.slice("--jwt=".length).trim();
-      if (!value) {
-        throw new Error("Missing value for --jwt");
-      }
-      jwt = value;
+
+    const jwtMatch = tryReadFlag(argv, i, "--jwt");
+    if (jwtMatch) {
+      jwt = jwtMatch.value;
+      i += jwtMatch.consumedCount;
       continue;
     }
-    if (arg === "--jwt") {
-      const next = argv[i + 1];
-      if (!next || next.startsWith("-")) {
-        throw new Error("Missing value for --jwt");
-      }
-      jwt = next.trim();
-      if (!jwt) {
-        throw new Error("Missing value for --jwt");
-      }
-      i += 1;
+
+    const apiKeyMatch = tryReadFlag(argv, i, "--api-key");
+    if (apiKeyMatch) {
+      apiKey = apiKeyMatch.value;
+      i += apiKeyMatch.consumedCount;
       continue;
     }
-    if (arg.startsWith("--api-key=")) {
-      const value = arg.slice("--api-key=".length).trim();
-      if (!value) {
-        throw new Error("Missing value for --api-key");
-      }
-      apiKey = value;
+
+    const apiSecretMatch = tryReadFlag(argv, i, "--api-secret");
+    if (apiSecretMatch) {
+      apiSecret = apiSecretMatch.value;
+      i += apiSecretMatch.consumedCount;
       continue;
     }
-    if (arg === "--api-key") {
-      const next = argv[i + 1];
-      if (!next || next.startsWith("-")) {
-        throw new Error("Missing value for --api-key");
-      }
-      apiKey = next.trim();
-      if (!apiKey) {
-        throw new Error("Missing value for --api-key");
-      }
-      i += 1;
-      continue;
-    }
-    if (arg.startsWith("--api-secret=")) {
-      const value = arg.slice("--api-secret=".length).trim();
-      if (!value) {
-        throw new Error("Missing value for --api-secret");
-      }
-      apiSecret = value;
-      continue;
-    }
-    if (arg === "--api-secret") {
-      const next = argv[i + 1];
-      if (!next || next.startsWith("-")) {
-        throw new Error("Missing value for --api-secret");
-      }
-      apiSecret = next.trim();
-      if (!apiSecret) {
-        throw new Error("Missing value for --api-secret");
-      }
-      i += 1;
-      continue;
-    }
-    if (arg.startsWith("--path=")) {
-      const value = arg.slice("--path=".length).trim();
-      if (!value) {
-        throw new Error("Missing value for --path");
-      }
-      pathArg = value;
-      continue;
-    }
-    if (arg === "--path" || arg === "-p") {
-      const next = argv[i + 1];
-      if (!next || next.startsWith("-")) {
-        throw new Error("Missing value for --path");
-      }
-      pathArg = next.trim();
-      if (!pathArg) {
-        throw new Error("Missing value for --path");
-      }
-      i += 1;
+
+    const pathMatch = tryReadFlag(argv, i, "--path", "-p");
+    if (pathMatch) {
+      pathArg = pathMatch.value;
+      i += pathMatch.consumedCount;
       continue;
     }
 
     if (arg.startsWith("-")) {
-      throw new Error(
-        `Unknown argument: "${arg}". Supported flags: ${PINATA_SUPPORTED_FLAGS}`
-      );
+      throw buildUnknownFlagError(arg, PINATA_SUPPORTED_FLAGS);
     }
 
-    throw new Error(
-      `Unexpected positional argument: "${arg}". Supported flags: ${PINATA_SUPPORTED_FLAGS}`
-    );
+    throw buildUnexpectedPositionalArgError(arg, PINATA_SUPPORTED_FLAGS);
   }
 
   if ((apiKey && !apiSecret) || (!apiKey && apiSecret)) {

@@ -40,7 +40,7 @@ const envSnapshot = captureEnv([
   "HEDERA_NETWORK",
 ]);
 
-const TEST_DID = "did:t3n:a:abc123def4567890";
+const TEST_DID = "did:t3n:bca583d0718b5567627cf92858310d690e7ae61b";
 const TEST_IDENTITY_WALLET = `0x${"1".repeat(40)}`;
 const TEST_HEDERA_OWNER = `0x${"3".repeat(40)}`;
 const TEST_PRIVATE_KEY = `0x${"2".repeat(64)}`;
@@ -57,11 +57,11 @@ async function writeIdentityConfig(
       {
         version: 1,
         created_at: "2026-03-06T00:00:00.000Z",
-        did_key: "did:key:z6Mkk11111111111111111111111111111111111111111111",
         did_t3n: TEST_DID,
         hedera_wallet: TEST_IDENTITY_WALLET,
         network_tier: "testnet",
         private_key: TEST_PRIVATE_KEY,
+        public_key: "0x" + "b".repeat(66),
         ...(withHederaMetadata
           ? {
               hedera_registration: {

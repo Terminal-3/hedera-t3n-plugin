@@ -9,9 +9,12 @@ import { existsSync } from "fs";
 import { readFile, stat } from "fs/promises";
 import { resolve } from "path";
 
+import { assertJsonObjectShape } from "./agentCard.js";
 import { getAgentIdentityConfigPath } from "./env.js";
 import { messageFromError } from "./tool-result.js";
 import { validateStoredCredentials } from "./validation.js";
+
+import type { StoredCredentials } from "./storage.js";
 
 const CREATE_IDENTITY_HINT =
   "Please checkout the repository and use `pnpm create-identity` to create an identity configuration file.";
@@ -32,8 +35,10 @@ export type AgentIdentityConfigResult =
       details?: string;
     };
 
-export function resolveAgentIdentityConfigPath(): AgentIdentityConfigResult {
-  const configPath = getAgentIdentityConfigPath();
+export function resolveAgentIdentityConfigPath(
+  options?: { env?: NodeJS.ProcessEnv }
+): AgentIdentityConfigResult {
+  const configPath = getAgentIdentityConfigPath(options?.env);
   if (!configPath) {
     return {
       ok: false,
@@ -46,6 +51,23 @@ export function resolveAgentIdentityConfigPath(): AgentIdentityConfigResult {
     ok: true,
     path: resolve(configPath),
   };
+}
+
+export function resolveRequiredAgentIdentityConfigPath(options: {
+  pathOverride?: string;
+  env?: NodeJS.ProcessEnv;
+  missingPathMessage: string;
+}): string {
+  const configuredPath =
+    options.pathOverride && options.pathOverride.trim() !== ""
+      ? options.pathOverride.trim()
+      : getAgentIdentityConfigPath(options.env);
+
+  if (!configuredPath) {
+    throw new Error(options.missingPathMessage);
+  }
+
+  return resolve(configuredPath);
 }
 
 export async function readAgentIdentityConfig(
@@ -131,4 +153,105 @@ export function validateAgentIdentityConfig(
     ok: true,
     path: resolvedPath,
   };
+}
+
+function assertJsonObject(
+  data: unknown,
+  resolvedPath: string,
+  invalidObjectMessage?: string
+): Record<string, unknown> {
+  assertJsonObjectShape(
+    data,
+    invalidObjectMessage ?? `Identity configuration at ${resolvedPath} must be a JSON object.`
+  );
+  return data as Record<string, unknown>;
+}
+
+export async function loadAgentIdentityConfigObject(options: {
+  resolvedPath: string;
+  emptyFileMessage: string;
+  invalidObjectMessage?: string;
+}): Promise<Record<string, unknown>> {
+  const readResult = await readAgentIdentityConfig(options.resolvedPath);
+  if (!readResult.ok) {
+    throw new Error(readResult.humanMessage);
+  }
+  if (readResult.data === undefined) {
+    throw new Error(options.emptyFileMessage);
+  }
+
+  return assertJsonObject(
+    readResult.data,
+    options.resolvedPath,
+    options.invalidObjectMessage
+  );
+}
+
+export async function loadValidatedStoredCredentials(options: {
+  resolvedPath: string;
+  emptyFileMessage: string;
+  invalidObjectMessage?: string;
+  disallowLocalMessage?: string;
+}): Promise<{
+  path: string;
+  data: Record<string, unknown>;
+  credentials: StoredCredentials;
+}> {
+  const data = await loadAgentIdentityConfigObject({
+    resolvedPath: options.resolvedPath,
+    emptyFileMessage: options.emptyFileMessage,
+    invalidObjectMessage: options.invalidObjectMessage,
+  });
+
+  const validateResult = validateAgentIdentityConfig(data, options.resolvedPath);
+  if (!validateResult.ok) {
+    throw new Error(validateResult.humanMessage);
+  }
+
+  const credentials = validateStoredCredentials(data);
+  if (credentials.network_tier === "local" && options.disallowLocalMessage) {
+    throw new Error(options.disallowLocalMessage);
+  }
+
+  return {
+    path: options.resolvedPath,
+    data,
+    credentials,
+  };
+}
+
+/**
+ * Resolves, loads, and validates the current agent identity configuration.
+ *
+ * Use this helper when callers want a single throw-on-failure path that returns the
+ * resolved file path, raw JSON object, and validated stored credentials together.
+ */
+export async function loadIdentityOrThrow(options: {
+  pathOverride?: string;
+  env?: NodeJS.ProcessEnv;
+  missingPathMessage?: string;
+  emptyFileMessage?: string;
+  invalidObjectMessage?: string;
+  disallowLocalMessage?: string;
+} = {}): Promise<{
+  path: string;
+  data: Record<string, unknown>;
+  credentials: StoredCredentials;
+}> {
+  const path = resolveRequiredAgentIdentityConfigPath({
+    pathOverride: options.pathOverride,
+    env: options.env,
+    missingPathMessage:
+      options.missingPathMessage ??
+      `Agent identity configuration path not set. ${CREATE_IDENTITY_HINT}`,
+  });
+
+  return loadValidatedStoredCredentials({
+    resolvedPath: path,
+    emptyFileMessage:
+      options.emptyFileMessage ??
+      `Identity configuration at ${path} is empty. Run \`pnpm create-identity\` first.`,
+    invalidObjectMessage: options.invalidObjectMessage,
+    disallowLocalMessage: options.disallowLocalMessage,
+  });
 }

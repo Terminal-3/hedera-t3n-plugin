@@ -80,11 +80,18 @@ export function resolveMlKemPublicKeyOverride(
 }
 
 export function createConfiguredMlKemPublicKeyHandler(
-  env: NodeJS.ProcessEnv = process.env
+  env: NodeJS.ProcessEnv = process.env,
+  baseUrl?: string
 ): GuestToHostHandler {
   const override = resolveMlKemPublicKeyOverride(env);
   if (!override) {
-    return createMlKemPublicKeyHandler();
+    if (!baseUrl) {
+      throw new Error(
+        "createConfiguredMlKemPublicKeyHandler requires baseUrl when no ML-KEM override is configured"
+      );
+    }
+
+    return createMlKemPublicKeyHandler(baseUrl);
   }
 
   const keyBytes = Uint8Array.from(Buffer.from(override, "base64"));
@@ -95,5 +102,5 @@ export function createConfiguredMlKemPublicKeyHandler(
     })
   );
 
-  return (): Promise<Uint8Array> => Promise.resolve(new Uint8Array(responseBytes));
+  return async (): Promise<Uint8Array> => new Uint8Array(responseBytes);
 }

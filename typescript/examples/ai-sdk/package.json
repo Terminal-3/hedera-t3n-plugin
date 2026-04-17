@@ -4,6 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "pretypecheck": "pnpm --dir ../../.. build",
     "typecheck": "tsc --noEmit",
     "ai-sdk:plugin-tool-calling-agent": "tsx tool-calling-agent.ts",
     "ai-sdk:tool-calling-agent": "tsx tool-calling-agent.ts"
@@ -22,5 +23,10 @@
     "@types/prompts": "^2.4.9",
     "tsx": "^4.21.0",
     "typescript": "^5.9.3"
+  },
+  "pnpm": {
+    "overrides": {
+      "@hashgraph/sdk": "^2.80.0"
+    }
   }
 }

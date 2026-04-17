@@ -14,10 +14,46 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { generateSecp256k1Keypair } from "../../src/utils/crypto";
 import { getHederaNetwork } from "../../src/utils/env.js";
-import { getHederaNetworkFromTier, registerDidT3n } from "../../src/utils/t3n";
+import { getHederaNetworkFromTier, registerDidT3n, type RegisterDidResult } from "../../src/utils/t3n";
 import { captureEnv, restoreEnv } from "../helpers/env.js";
 
 const envSnapshot = captureEnv(["HEDERA_NETWORK"]);
+
+async function callRegisterDidT3n(
+  privateKey: string,
+  networkTier: "local" | "testnet",
+  options?: Parameters<typeof registerDidT3n>[2]
+): Promise<RegisterDidResult> {
+  return await registerDidT3n(privateKey, networkTier, options) as RegisterDidResult;
+}
+
+function expectKnownNetworkFailure(error: unknown, disallowedMessage?: string): void {
+  expect(error).toBeInstanceOf(Error);
+  const message = error instanceof Error ? error.message : String(error);
+  if (disallowedMessage) {
+    expect(message.includes(disallowedMessage)).toBe(false);
+  }
+  expect(
+    message.includes("Network unreachable") ||
+      message.includes("Failed to register did:t3n:") ||
+      message.includes("Failed to resolve current version") ||
+      message.includes("404 Not Found") ||
+      message.includes("fetch failed") ||
+      message.includes("Agent registry record") ||
+      message.includes("timeout") ||
+      message.includes("aborted")
+  ).toBe(true);
+}
+
+function assertRegistrationResult(result: RegisterDidResult, expectedAgentUri?: string): void {
+  expect(result.did).toMatch(/^did:t3n:[0-9a-f]{40}$/i);
+  expect(result.address).toMatch(/^0x[0-9a-f]{40}$/);
+  if (expectedAgentUri === undefined) {
+    expect(result.agentUri).toBeUndefined();
+  } else {
+    expect(result.agentUri).toBe(expectedAgentUri);
+  }
+}
 
 describe("T3N integration", () => {
   beforeEach(() => {
@@ -30,93 +66,59 @@ describe("T3N integration", () => {
 
   it("should resolve network configuration from network tier", () => {
     const networkTier = "testnet";
-    const hederaNetwork = getHederaNetworkFromTier(networkTier);
-    const hederaNetworkFromEnv = getHederaNetwork();
+    const hederaNetwork = getHederaNetworkFromTier(networkTier) as "testnet";
+    const hederaNetworkFromEnv = getHederaNetwork() as "testnet";
 
     expect(hederaNetwork).toBe("testnet");
     expect(hederaNetworkFromEnv).toBe("testnet");
   });
 
-  it("should register did:t3n:a:", async () => {
-    const { privateKey } = generateSecp256k1Keypair();
+  it("should register did:t3n:", async () => {
+    const { privateKey } = generateSecp256k1Keypair() as { privateKey: string };
     const agentUri = "https://agent.test/.well-known/agent_card.json";
-    let result:
-      | Awaited<ReturnType<typeof registerDidT3n>>
-      | undefined;
-
     try {
-      result = await registerDidT3n(privateKey, "testnet", {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+      const result = await callRegisterDidT3n(privateKey, "testnet", {
         agentUri,
         verifyRegistration: false,
       });
+
+      assertRegistrationResult(result, agentUri);
+      expect(result.baseUrl).toBeDefined();
+      if (process.env.T3N_API_URL) {
+        expect(result.baseUrl).toBe(process.env.T3N_API_URL);
+      } else {
+        expect(result.baseUrl).toContain("staging");
+      }
+      expect(result.txHash).toBeDefined();
     } catch (error) {
-      // Network registration may fail if staging is unreachable (expected in CI/offline scenarios)
-      // Verify that error is properly formatted and indicates network issues
-      expect(error).toBeInstanceOf(Error);
-      const message = error instanceof Error ? error.message : String(error);
-      expect(message.includes("Must be authenticated before executing action")).toBe(false);
-      expect(
-        message.includes("Network unreachable") ||
-          message.includes("Failed to register did:t3n:a:") ||
-          message.includes("Failed to resolve current version") ||
-          message.includes("404 Not Found") ||
-          message.includes("fetch failed") ||
-          message.includes("Agent registry record") ||
-          message.includes("timeout") ||
-          message.includes("aborted")
-      ).toBe(true);
+      expectKnownNetworkFailure(error, "Must be authenticated before executing action");
       return;
     }
-
-    expect(result).toBeDefined();
-    // Local CCF auth currently returns `did:t3:a:...`; staging/prod returns `did:t3n:a:...`.
-    expect(result!.did).toMatch(/^did:t3n?:a:/);
-    expect(result!.address).toMatch(/^0x[0-9a-f]{40}$/);
-    expect(result!.agentUri).toBe(agentUri);
-    expect(result!.baseUrl).toBeDefined();
-    if (process.env.T3N_API_URL) {
-      expect(result!.baseUrl).toBe(process.env.T3N_API_URL);
-    } else {
-      expect(result!.baseUrl).toContain("staging");
-    }
-    expect(result!.txHash).toBeDefined();
   });
 
   it("can derive a T3N DID without agent-registry registration", async () => {
-    const { privateKey } = generateSecp256k1Keypair();
-    let result:
-      | Awaited<ReturnType<typeof registerDidT3n>>
-      | undefined;
-
+    const { privateKey } = generateSecp256k1Keypair() as { privateKey: string };
     try {
-      result = await registerDidT3n(privateKey, "testnet", {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+      const result = await callRegisterDidT3n(privateKey, "testnet", {
         registerAgentUri: false,
       });
+
+      assertRegistrationResult(result);
+      expect(result.baseUrl).toContain("staging");
+      expect(result.txHash).toBeUndefined();
     } catch (error) {
-      expect(error).toBeInstanceOf(Error);
-      const message = error instanceof Error ? error.message : String(error);
-      expect(message.includes("Failed to resolve current version")).toBe(false);
-      expect(
-        message.includes("Network unreachable") ||
-          message.includes("fetch failed") ||
-          message.includes("timeout") ||
-          message.includes("aborted")
-      ).toBe(true);
+      expectKnownNetworkFailure(error, "Failed to resolve current version");
       return;
     }
-
-    expect(result).toBeDefined();
-    expect(result!.did).toMatch(/^did:t3n?:a:/);
-    expect(result!.address).toMatch(/^0x[0-9a-f]{40}$/);
-    expect(result!.baseUrl).toContain("staging");
-    expect(result!.txHash).toBeUndefined();
-    expect(result!.agentUri).toBeUndefined();
   });
 
   describe("networkTier parameter", () => {
     it("should respect networkTier=local to use local/mock mode", async () => {
-      const { privateKey } = generateSecp256k1Keypair();
-      const result = await registerDidT3n(privateKey, "local", {
+      const { privateKey } = generateSecp256k1Keypair() as { privateKey: string };
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+      const result = await callRegisterDidT3n(privateKey, "local", {
         agentUri: "https://agent.local/.well-known/agent_card.json",
       });
 

@@ -27,6 +27,7 @@ import {
   loadPluginNetworkConfig,
 } from "./network-config.js";
 import type { StoredHederaRegistrationMetadata } from "./storage.js";
+import { messageFromError } from "./tool-result.js";
 
 export interface HederaIdentityRegistryConfig {
   jsonRpcUrl: string;
@@ -129,14 +130,10 @@ const IDENTITY_REGISTRY_ABI = [
 
 const identityRegistryInterface = new Interface(IDENTITY_REGISTRY_ABI);
 
-export function deriveHederaAddress(privateKey: string): string {
-  const wallet = new Wallet(privateKey);
-  return wallet.address.toLowerCase();
-}
-
-export function validateHederaAddress(address: string): boolean {
-  return /^0x[0-9a-fA-F]{40}$/.test(address);
-}
+export {
+  deriveHederaAddress,
+  validateHederaAddress,
+} from "./identity-utils.js";
 
 function getDefaultChainId(network: Exclude<Environment, "local">): number {
   return network === "mainnet" ? HEDERA_MAINNET_CHAIN_ID : HEDERA_TESTNET_CHAIN_ID;
@@ -148,10 +145,6 @@ function buildHederaNetworkName(network: Exclude<Environment, "local">): string 
 
 function compareAddresses(left: string, right: string): boolean {
   return left.toLowerCase() === right.toLowerCase();
-}
-
-function messageFromError(error: unknown): string {
-  return error instanceof Error && error.message ? error.message : String(error);
 }
 
 function asContractTransactionLike(value: unknown, context: string): ContractTransactionLike {

@@ -30,11 +30,11 @@ describe("storage utils", () => {
   it("stores credentials with metadata", async () => {
     const path = await storeCredentials(
       {
-        did_key: "did:key:zabc",
-        did_t3n: "did:t3n:a:abc123",
+        did_t3n: "did:t3n:649f4f8d0e0916b6f5e7d06ce100821557c8445f",
         hedera_wallet: "0x" + "1".repeat(40),
         network_tier: "local",
         private_key: "0x" + "2".repeat(64),
+        public_key: "0x" + "3".repeat(66),
       },
       { outputDir: OUTPUT_DIR }
     );
@@ -43,7 +43,7 @@ describe("storage utils", () => {
     const parsed = JSON.parse(file);
 
     expect(parsed.version).toBe(1);
-    expect(parsed.did_t3n).toBe("did:t3n:a:abc123");
+    expect(parsed.did_t3n).toBe("did:t3n:649f4f8d0e0916b6f5e7d06ce100821557c8445f");
     expect(parsed.created_at).toBeTruthy();
   });
 
@@ -51,11 +51,11 @@ describe("storage utils", () => {
     const didFragment = "abc123";
     await storeCredentials(
       {
-        did_key: "did:key:zabc",
-        did_t3n: `did:t3n:a:${didFragment}`,
+        did_t3n: `did:t3n:${didFragment}`,
         hedera_wallet: "0x" + "1".repeat(40),
         network_tier: "local",
         private_key: "0x" + "2".repeat(64),
+        public_key: "0x" + "3".repeat(66),
       },
       { outputDir: OUTPUT_DIR }
     );
@@ -69,11 +69,11 @@ describe("storage utils", () => {
     const sanitizedFragment = "abc123test";
     await storeCredentials(
       {
-        did_key: "did:key:zabc",
-        did_t3n: `did:t3n:a:${didFragment}`,
+        did_t3n: `did:t3n:${didFragment}`,
         hedera_wallet: "0x" + "1".repeat(40),
         network_tier: "local",
         private_key: "0x" + "2".repeat(64),
+        public_key: "0x" + "3".repeat(66),
       },
       { outputDir: OUTPUT_DIR }
     );
@@ -88,11 +88,11 @@ describe("storage utils", () => {
     const didFragment = "abc_123-test";
     await storeCredentials(
       {
-        did_key: "did:key:zabc",
-        did_t3n: `did:t3n:a:${didFragment}`,
+        did_t3n: `did:t3n:${didFragment}`,
         hedera_wallet: "0x" + "1".repeat(40),
         network_tier: "local",
         private_key: "0x" + "2".repeat(64),
+        public_key: "0x" + "3".repeat(66),
       },
       { outputDir: OUTPUT_DIR }
     );
@@ -105,11 +105,11 @@ describe("storage utils", () => {
     const didFragment = "@#$%";
     await storeCredentials(
       {
-        did_key: "did:key:zabc",
-        did_t3n: `did:t3n:a:${didFragment}`,
+        did_t3n: `did:t3n:${didFragment}`,
         hedera_wallet: "0x" + "1".repeat(40),
         network_tier: "local",
         private_key: "0x" + "2".repeat(64),
+        public_key: "0x" + "3".repeat(66),
       },
       { outputDir: OUTPUT_DIR }
     );

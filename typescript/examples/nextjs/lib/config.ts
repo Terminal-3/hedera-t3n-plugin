@@ -4,12 +4,14 @@ import { z } from "zod";
 
 import { loadDemoServerEnv } from "@/lib/server/load-env";
 
-const providerSchema = z.enum(["ollama", "openai", "openai-compatible"]);
+const providerSchema = z.enum(["ollama", "openai", "openai-compatible", "groq"]);
 
 const envSchema = z.object({
-  DEMO_MODEL_PROVIDER: providerSchema.default("ollama"),
-  DEMO_MODEL: z.string().trim().min(1).default("qwen2.5"),
+  DEMO_MODEL_PROVIDER: providerSchema.default("groq"),
+  DEMO_MODEL: z.string().trim().min(1).default("llama-3.3-70b-versatile"),
   OLLAMA_BASE_URL: z.string().trim().optional(),
+  GROQ_API_KEY: z.string().trim().optional(),
+  GROQ_BASE_URL: z.string().trim().optional(),
   OPENAI_API_KEY: z.string().trim().optional(),
   OPENAI_BASE_URL: z.string().trim().optional(),
   OPENAI_COMPATIBLE_BASE_URL: z.string().trim().optional(),
@@ -43,6 +45,8 @@ export function getDemoConfig() {
     providerBaseUrl:
       provider === "ollama"
         ? ensureV1Path(ollamaBaseUrl)
+        : provider === "groq"
+          ? normalizeBaseUrl(parsed.GROQ_BASE_URL ?? "https://api.groq.com/openai/v1")
         : provider === "openai-compatible"
           ? normalizeBaseUrl(
               parsed.OPENAI_COMPATIBLE_BASE_URL ?? ensureV1Path(ollamaBaseUrl)
@@ -51,6 +55,8 @@ export function getDemoConfig() {
     providerApiKey:
       provider === "ollama"
         ? parsed.OPENAI_COMPATIBLE_API_KEY ?? "ollama"
+        : provider === "groq"
+          ? parsed.GROQ_API_KEY
         : provider === "openai-compatible"
           ? parsed.OPENAI_COMPATIBLE_API_KEY
           : parsed.OPENAI_API_KEY,
@@ -63,6 +69,13 @@ export function getProviderReadiness() {
     return {
       ready: false,
       reason: "OPENAI_API_KEY is missing.",
+    };
+  }
+
+  if (config.provider === "groq" && !config.providerApiKey) {
+    return {
+      ready: false,
+      reason: "GROQ_API_KEY is missing.",
     };
   }
 

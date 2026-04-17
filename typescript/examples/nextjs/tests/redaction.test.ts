@@ -7,12 +7,12 @@ describe("redaction", () => {
     const result = redactValue({
       path: "/tmp/identity.json",
       private_key: "0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef",
-      did_key: "did:key:z123",
+      did_t3n: "did:t3n:649f4f8d0e0916b6f5e7d06ce100821557c8445f",
     }) as Record<string, unknown>;
 
     expect(result.path).toBe("[redacted]");
     expect(result.private_key).toBe("[redacted]");
-    expect(result.did_key).toBe("did:key:z123");
+    expect(result.did_t3n).toBe("did:t3n:649f4f8d0e0916b6f5e7d06ce100821557c8445f");
   });
 
   it("keeps transaction hashes visible", () => {
